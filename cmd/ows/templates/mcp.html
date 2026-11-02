@@ -1,0 +1,23 @@
+{{template "head" .}}
+<h1>{{.Profile.Profile}}</h1>
+<p class="lead">{{len .Profile.Tools}} tools, exactly as the reference server lists them, so another server can offer the same ones and clients can rely on the shapes. A <a href="/mcp/profile/">compatible server keeps to a few rules</a>. The whole profile is <a href="/mcp/tools.json">tools.json</a>.</p>
+<p class="notice">{{.Profile.Source}} It is a profile of the schema over MCP, not a standard of its own, and makes no stability promise before v1.</p>
+<h2>Instructions a server gives assistants</h2>
+{{range lines .Profile.Instructions}}<p>{{.}}</p>
+{{end}}
+<h2>Error codes</h2>
+<p>A tool error's text starts with one of: {{range $i, $c := .Profile.ErrorCodes}}{{if $i}}, {{end}}<code>{{$c}}</code>{{end}}.</p>
+<h2>Tools</h2>
+<ul class="links">{{range .Profile.Tools}}<li><a href="#{{.Name}}"><code>{{.Name}}</code></a>{{if .Annotations.ReadOnlyHint}} <small>read-only</small>{{end}}</li>
+{{end}}</ul>
+{{range .Profile.Tools}}
+<section id="{{.Name}}">
+<h3><code>{{.Name}}</code>{{if .Annotations.ReadOnlyHint}} <small>read-only</small>{{end}}</h3>
+<p>{{.Description}}</p>
+{{with inputs .InputSchema}}<div class="scroll"><table>
+<thead><tr><th>Argument</th><th>Type</th><th>Meaning</th></tr></thead>
+<tbody>{{range .}}<tr><td><code>{{.Name}}</code>{{if .Required}} <small>required</small>{{end}}</td><td>{{.Type}}</td><td>{{.Description}}</td></tr>
+{{end}}</tbody></table></div>{{end}}
+</section>
+{{end}}
+{{template "foot" .}}

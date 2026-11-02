@@ -1,0 +1,27 @@
+{{template "head" .}}
+<section class="hero">
+<h1>Your training, in a format you can take anywhere.</h1>
+<p class="lead">The Open Workout Schema records what someone did: a workout, its exercises and sets, where the record came from, and which numbers were inferred. Any app can write it, any assistant can read it, and the person keeps the log.</p>
+<p class="actions"><a class="button" href="/schema/">Read the schema</a><a class="button ghost" href="/mcp/">See the MCP tools</a></p>
+</section>
+<section class="grid">
+<div><h2>Honest numbers</h2><p>A set holds what the person stated, in the unit they gave. Anything inferred is listed in <code>estimates</code> by JSON pointer, so a number's standing travels with it.</p></div>
+<div><h2>Provenance on every record</h2><p><code>source</code> says which app or assistant wrote it and the record's ID there; <code>merged_sources</code> keeps both when two apps describe the same session.</p></div>
+<div><h2>One language for exercises</h2><p>Each entry names its exercise by an <a href="https://openexercise.org">Open Exercise</a> ID and says whether the match is sure, close, the person's own, or unmatched.</p></div>
+</section>
+<section>
+<h2>Documents</h2>
+<dl class="fields">
+{{range .Schemas}}<dt><a href="/schema/#{{.Kind}}">{{.Kind}}</a></dt><dd>{{.Description}}</dd>
+{{end}}</dl>
+</section>
+<section>
+<h2>Use it</h2>
+<ul class="links">
+{{range .Schemas}}<li><a href="/schema/v0/{{.Kind}}.json">{{.Kind}}.json</a>, JSON Schema (draft 2020-12), at its <code>$id</code></li>
+{{end}}<li><a href="/mcp/tools.json">The MCP tool profile</a>: {{len .Profile.Tools}} tools, generated from the reference server</li>
+<li><a href="/examples/push-day.json">An example workout</a> and <a href="/examples/two-day-linear.json">an example program</a></li>
+<li><code>go run github.com/openexercise/open-workout/cmd/ows@latest validate my-workout.json</code></li>
+</ul>
+</section>
+{{template "foot" .}}

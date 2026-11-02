@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openworkout.dev/schema/v0/program.json",
+  "progression": "Add 2.5 kg to a lift whenever every set reaches its reps.",
+  "weeks": [
+    {
+      "days": [
+        {
+          "key": "a",
+          "name": "Day A",
+          "slots": [
+            { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } },
+            { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } }
+          ]
+        },
+        {
+          "key": "b",
+          "name": "Day B",
+          "slots": [
+            { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } },
+            { "exercise": { "id": "oec:barbell-overhead-press" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } }
+          ]
+        }
+      ]
+    }
+  ]
+}

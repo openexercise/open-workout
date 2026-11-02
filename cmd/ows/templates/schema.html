@@ -1,0 +1,16 @@
+{{template "head" .}}
+<h1>Open Workout Schema v0</h1>
+<p class="lead">Two documents. Loads keep the unit the person gave; distances are metres and durations seconds. Every field a server did not get from the person is listed in <code>estimates</code>.</p>
+{{range .Schemas}}
+<section id="{{.Kind}}">
+<h2>{{.Title}}</h2>
+<p>{{.Description}} Schema: <a href="/schema/v0/{{.Kind}}.json"><code>{{.ID}}</code></a>.</p>
+{{template "object" .Root}}
+{{range .Defs}}<h3 id="{{$.Path}}-{{.Name}}">{{.Name}}</h3>{{if .Description}}<p>{{.Description}}</p>{{end}}{{template "object" .}}{{end}}
+</section>
+{{end}}
+{{template "foot" .}}
+{{define "object"}}{{if .Properties}}<div class="scroll"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+<tbody>{{range .Properties}}<tr><td><code>{{.Name}}</code>{{if .Required}} <small>required</small>{{end}}</td><td>{{.Type}}</td><td>{{.Description}}</td></tr>
+{{end}}</tbody></table></div>{{end}}{{end}}

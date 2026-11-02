@@ -11,13 +11,26 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | `schema/CHANGELOG.md` | What changed in v0 |
 | `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |
 | `mcp/README.md` | What a server offering those tools keeps to |
+| `examples` | A workout and a program in the format |
+| `cmd/ows` | `ows validate`, which checks documents against the schemas, and `ows site`, which builds the website |
 
 Until v1 these files are published here from [Lifterclub](https://lifterclub.com), the reference implementation, and the schema is validated against real output there. Issues and proposals belong here.
 
+## Use it
+
+```bash
+go run ./cmd/ows validate            # the examples
+go run ./cmd/ows validate my-log.json # your own documents, files or directories
+go test ./...
+go run ./cmd/ows site dist           # the website into dist
+```
+
+A document names its schema in `$schema`; without one it is checked as a workout.
+
 ## Coming
 
-- The site at [openworkout.dev](https://openworkout.dev), built from this repository.
-- `ows validate`, a validator for workouts, programs and logs, and `ows conformance`, which runs a fixed script against any server offering the reference REST API.
+- The site at [openworkout.dev](https://openworkout.dev), deployed from this repository once it is public.
+- `ows conformance`, which runs a fixed script against any server offering the reference REST API.
 - Client libraries.
 
 ## Relationship to other standards

@@ -1,6 +1,6 @@
 # Contributing
 
-Open an issue. Until v1 the schema and the tool profile are published here from the reference implementation, so a change starts as an issue or proposal in this repository, is agreed here, and then lands in the next published version with a changelog entry.
+Open an issue or pull request. Run `go run ./cmd/ows validate` and `go test ./...` first; a change to a schema needs a changelog entry and the examples still valid. Until v1 the schema and the tool profile are published here from the reference implementation, so a change starts as an issue or proposal in this repository, is agreed here, and then lands in the next published version with a changelog entry.
 
 ## Proposing a change
 
