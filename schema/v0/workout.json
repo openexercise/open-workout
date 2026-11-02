@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openworkout.dev/schema/v0/workout.json",
+  "title": "Open Workout Schema v0: workout",
+  "description": "One workout: exercise entries with their sets, plus where the record came from. Draft; may change until v1.",
+  "type": "object",
+  "required": ["started_at", "source", "exercises"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://openworkout.dev/schema/v0/workout.json" },
+    "id": { "type": "string", "description": "Assigned by the server that stores the workout." },
+    "started_at": { "type": "string", "format": "date-time" },
+    "ended_at": { "type": "string", "format": "date-time" },
+    "title": { "type": "string" },
+    "notes": { "type": "string" },
+    "source": { "$ref": "#/$defs/source" },
+    "merged_sources": {
+      "description": "Other records of the same session, merged into this one: the same run from two apps, say. This workout is the fullest of them.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/source" }
+    },
+    "exercises": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "program": {
+      "type": "object",
+      "description": "The program day this workout was part of: a label, which changes nothing else here. listed false means the program was withdrawn, and says nothing more.",
+      "required": ["listed"],
+      "additionalProperties": false,
+      "properties": {
+        "listed": { "type": "boolean" },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "version": { "type": "integer" },
+        "day": { "type": "string" },
+        "day_name": { "type": "string" }
+      }
+    },
+    "estimates": {
+      "description": "JSON pointers (RFC 6901) to values that were inferred or assumed rather than given.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^(/[^/]*)*$" }
+    }
+  },
+  "$defs": {
+    "source": {
+      "description": "Provenance: where the record came from.",
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["app", "mcp", "api", "import"] },
+        "client": { "type": "string", "description": "The client or app, e.g. claude, strong, hevy." },
+        "external_id": { "type": ["string", "null"], "description": "The workout's ID in the app it was imported from." }
+      }
+    },
+    "entry": {
+      "description": "One exercise in a workout.",
+      "type": "object",
+      "required": ["exercise", "sets"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Assigned by the server; used to edit the entry." },
+        "exercise": { "$ref": "#/$defs/exercise" },
+        "text": { "type": "string", "description": "What the user called the exercise." },
+        "notes": { "type": "string" },
+        "sets": { "type": "array", "items": { "$ref": "#/$defs/set" } }
+      }
+    },
+    "exercise": {
+      "description": "The exercise an entry was matched to. catalogue and custom are confirmed; close and unmatched need confirmation and never count toward records.",
+      "type": "object",
+      "required": ["id", "name", "match"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": ["string", "null"],
+          "description": "Open Exercise Catalogue ID (oec:<slug>) or a custom exercise ID; null when nothing matched."
+        },
+        "name": { "type": "string" },
+        "match": { "enum": ["catalogue", "close", "custom", "unmatched"] }
+      }
+    },
+    "set": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "description": "Assigned by the server; used to edit the set." },
+        "type": { "enum": ["working", "warmup", "backoff", "amrap", "failure", "drop"], "default": "working" },
+        "reps": { "type": "integer", "minimum": 0 },
+        "load": { "$ref": "#/$defs/load" },
+        "rpe": { "type": "number", "minimum": 1, "maximum": 10 },
+        "duration_s": { "type": "integer", "minimum": 0 },
+        "distance_m": { "type": "number", "minimum": 0 }
+      }
+    },
+    "load": {
+      "description": "A weight in the unit the user gave it.",
+      "type": "object",
+      "required": ["value", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["kg", "lb"] }
+      }
+    }
+  }
+}
