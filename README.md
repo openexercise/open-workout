@@ -1,0 +1,29 @@
+# Open Workout
+
+An open format for a workout log, and the set of MCP tools an assistant uses to read and write one.
+
+**Status: v0 development draft.** The schema may change until v1, and every change is listed in its changelog. v1 freezes when a second application writes it in production; after that, changes are additive.
+
+| | |
+| --- | --- |
+| `schema/v0/workout.json` | The Open Workout Schema (OWS): one workout, its exercise entries and sets, where the record came from, and every inferred value listed by JSON pointer |
+| `schema/v0/program.json` | A training program as a library publishes it |
+| `schema/CHANGELOG.md` | What changed in v0 |
+| `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |
+| `mcp/README.md` | What a server offering those tools keeps to |
+
+Until v1 these files are published here from [Lifterclub](https://lifterclub.com), the reference implementation, and the schema is validated against real output there. Issues and proposals belong here.
+
+## Coming
+
+- The site at [openworkout.dev](https://openworkout.dev), built from this repository.
+- `ows validate`, a validator for workouts, programs and logs, and `ows conformance`, which runs a fixed script against any server offering the reference REST API.
+- Client libraries.
+
+## Relationship to other standards
+
+An OWS entry refers to its exercise by an [Open Exercise](https://github.com/openexercise/open-exercise) ID (`oec:barbell-bench-press`). Open Exercise says what an exercise is; Open Workout records what someone did.
+
+## Licence
+
+[Apache-2.0](LICENSE).
