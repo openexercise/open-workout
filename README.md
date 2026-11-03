@@ -27,9 +27,10 @@ go run ./cmd/ows site dist           # the website into dist
 
 A document names its schema in `$schema`; without one it is checked as a workout.
 
+The site at [openworkout.dev](https://openworkout.dev) is built from this repository by `ows site` and deployed by the Pages workflow on every push to `main`, so the schemas resolve at their `$id` URLs.
+
 ## Coming
 
-- The site at [openworkout.dev](https://openworkout.dev), deployed from this repository once it is public.
 - `ows conformance`, which runs a fixed script against any server offering the reference REST API.
 - Client libraries.
 
