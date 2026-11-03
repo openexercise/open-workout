@@ -47,6 +47,10 @@
             "items": {
               "additionalProperties": false,
               "properties": {
+                "calories": {
+                  "description": "kilocalories, only as a machine, watch or app reported them",
+                  "type": "integer"
+                },
                 "distance_m": {
                   "description": "distance in metres, for cardio",
                   "type": "number"
@@ -58,6 +62,10 @@
                 "estimated": {
                   "description": "true when you inferred the values (for example from a photo) rather than the user stating them",
                   "type": "boolean"
+                },
+                "heart_rate_bpm": {
+                  "description": "average heart rate in beats per minute, only as a watch or app reported it",
+                  "type": "integer"
                 },
                 "load": {
                   "description": "weight lifted; leave out for bodyweight",
@@ -418,6 +426,10 @@
                   "items": {
                     "additionalProperties": false,
                     "properties": {
+                      "calories": {
+                        "description": "kilocalories, only as a machine, watch or app reported them",
+                        "type": "integer"
+                      },
                       "distance_m": {
                         "description": "distance in metres, for cardio",
                         "type": "number"
@@ -429,6 +441,10 @@
                       "estimated": {
                         "description": "true when you inferred the values (for example from a photo) rather than the user stating them",
                         "type": "boolean"
+                      },
+                      "heart_rate_bpm": {
+                        "description": "average heart rate in beats per minute, only as a watch or app reported it",
+                        "type": "integer"
                       },
                       "load": {
                         "description": "weight lifted; leave out for bodyweight",
@@ -656,6 +672,10 @@
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
+          "calories": {
+            "description": "set: kilocalories, as a machine or app reported them",
+            "type": "integer"
+          },
           "date": {
             "description": "workout: move it to this day, YYYY-MM-DD",
             "type": "string"
@@ -679,6 +699,10 @@
           "exercise_id": {
             "description": "exercise entry: which exercise it is, from needs_confirmation candidates or search_exercises",
             "type": "string"
+          },
+          "heart_rate_bpm": {
+            "description": "set: average heart rate in beats per minute",
+            "type": "integer"
           },
           "load": {
             "description": "set: weight",
