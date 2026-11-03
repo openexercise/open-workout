@@ -6,6 +6,9 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-03: `calories` and `heart_rate_bpm` added to a set: kilocalories as a machine or app
+  reported them, and the average heart rate over the set. Both optional, named after the Open
+  Exercise metrics `calories` and `heart-rate`, for cardio logged by other apps and watches.
 - 2026-11-02: `updated_at` added to a workout: when the stored record last changed, by the server's
   clock, any change to the workout, its entries, sets or program label. Optional; for mirroring a
   log through a change feed.

@@ -90,7 +90,9 @@
         "load": { "$ref": "#/$defs/load" },
         "rpe": { "type": "number", "minimum": 1, "maximum": 10 },
         "duration_s": { "type": "integer", "minimum": 0 },
-        "distance_m": { "type": "number", "minimum": 0 }
+        "distance_m": { "type": "number", "minimum": 0 },
+        "calories": { "type": "integer", "minimum": 0, "description": "Kilocalories, as a machine or app reported them." },
+        "heart_rate_bpm": { "type": "integer", "minimum": 0, "description": "Average heart rate over the set, in beats per minute." }
       }
     },
     "load": {
