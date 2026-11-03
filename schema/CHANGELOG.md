@@ -6,6 +6,9 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-02: `updated_at` added to a workout: when the stored record last changed, by the server's
+  clock, any change to the workout, its entries, sets or program label. Optional; for mirroring a
+  log through a change feed.
 - 2026-11-01: Published alongside the OWS MCP tool profile (`mcp/tools.json`). Exercises are
   identified by Open Exercise IDs (`https://openexercise.org/schema/v0/exercise.json`). No schema
   change.

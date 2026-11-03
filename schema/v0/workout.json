@@ -11,6 +11,7 @@
     "id": { "type": "string", "description": "Assigned by the server that stores the workout." },
     "started_at": { "type": "string", "format": "date-time" },
     "ended_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time", "description": "When the stored record last changed, by the server's clock: the workout, an entry, a set or the program label. For mirroring; absent from a document that was never stored." },
     "title": { "type": "string" },
     "notes": { "type": "string" },
     "source": { "$ref": "#/$defs/source" },
