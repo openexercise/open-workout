@@ -2,10 +2,13 @@
 package ows
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path/filepath"
+	"io/fs"
+	"os"
+	"path"
 	"sort"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -22,18 +25,58 @@ type Validator struct {
 
 // NewValidator compiles every schema under root/schema/v0.
 func NewValidator(root string) (*Validator, error) {
-	v := &Validator{byID: map[string]*jsonschema.Schema{}, byKind: map[string]*jsonschema.Schema{}}
+	return NewValidatorFS(os.DirFS(root))
+}
+
+// NewValidatorFS compiles every schema under schema/v0 in fsys: a checkout, or the module's
+// embedded copy (openworkout.Schemas). Each is registered under its $id, so references between
+// them resolve without touching the network.
+func NewValidatorFS(fsys fs.FS) (*Validator, error) {
 	c := jsonschema.NewCompiler()
+	ids := map[string]string{}
 	for _, kind := range Kinds {
-		path := filepath.Join(root, "schema", "v0", kind+".json")
-		s, err := c.Compile(path)
+		name := path.Join("schema", "v0", kind+".json")
+		data, err := fs.ReadFile(fsys, name)
 		if err != nil {
-			return nil, fmt.Errorf("compile %s: %w", path, err)
+			return nil, fmt.Errorf("read %s: %w", name, err)
+		}
+		doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", name, err)
+		}
+		id, _ := doc.(map[string]any)["$id"].(string)
+		if id == "" {
+			return nil, fmt.Errorf("%s has no $id", name)
+		}
+		if err := c.AddResource(id, doc); err != nil {
+			return nil, fmt.Errorf("add %s: %w", name, err)
+		}
+		ids[kind] = id
+	}
+	v := &Validator{byID: map[string]*jsonschema.Schema{}, byKind: map[string]*jsonschema.Schema{}}
+	for _, kind := range Kinds {
+		s, err := c.Compile(ids[kind])
+		if err != nil {
+			return nil, fmt.Errorf("compile %s: %w", kind, err)
 		}
 		v.byKind[kind] = s
 		v.byID[s.ID] = s
 	}
 	return v, nil
+}
+
+// ValidateAs returns every problem in a document of a kind ("workout", "program"), whatever its
+// $schema says. A server's response is a workout because of where it came from.
+func (v *Validator) ValidateAs(kind string, data []byte) []string {
+	s, ok := v.byKind[kind]
+	if !ok {
+		return []string{fmt.Sprintf("unknown kind %q", kind)}
+	}
+	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(data))
+	if err != nil {
+		return []string{"invalid JSON: " + err.Error()}
+	}
+	return problems(s, doc)
 }
 
 // IDs lists the schema $ids the validator knows.
@@ -63,7 +106,11 @@ func (v *Validator) Validate(data []byte) []string {
 			schema = s
 		}
 	}
-	if err := schema.Validate(doc); err != nil {
+	return problems(schema, doc)
+}
+
+func problems(s *jsonschema.Schema, doc any) []string {
+	if err := s.Validate(doc); err != nil {
 		var ve *jsonschema.ValidationError
 		if errors.As(err, &ve) {
 			return []string{ve.Error()}
