@@ -12,6 +12,9 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |
 | `mcp/README.md` | What a server offering those tools keeps to |
 | `examples` | A workout and a program in the format |
+| `api/v1.yaml` | The reference REST API as OpenAPI 3.1, as Lifterclub serves it; workouts refer to `schema/v0/workout.json` |
+| `clients/go` | A thin Go client for that API, standard library only: `github.com/openexercise/open-workout/clients/go` |
+| `clients/ts` | A thin TypeScript client, `lifterclub-client`, generated from `api/v1.yaml` |
 | `cmd/ows` | `ows validate`, which checks documents against the schemas; `ows conformance`, which checks a server's REST API; and `ows site`, which builds the website |
 | `conformance` | The conformance script as a Go package, for a server's own tests |
 
@@ -53,9 +56,15 @@ OWS_TOKEN=… ows conformance https://api.example.com
 
 The script logs one workout and deletes it at the end, also when a check fails part way, so use a test account. Errors are RFC 9457 problems whose `code` the report quotes; `--json` prints the report as JSON. A server that passes may call itself conformant; the badge is self-reported. A server written in Go can run the same script in its tests with `conformance.Run`; Lifterclub's CI does.
 
-## Coming
+## Clients
 
-- Client libraries.
+Both are thin: the access token on every request, an `Idempotency-Key` on every POST, RFC 9457 problems as errors with `Retry-After` when rate limited, and paging over the workout list and the change feed. Getting the token (OAuth 2.1 with PKCE) is the app's job. Each has a README.
+
+```bash
+go get github.com/openexercise/open-workout/clients/go
+```
+
+The TypeScript package isn't on npm yet; build it from `clients/ts` (`npm ci && npm run build`). `npm run check` fails when its generated types no longer match `api/v1.yaml`.
 
 ## Relationship to other standards
 

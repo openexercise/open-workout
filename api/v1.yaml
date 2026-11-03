@@ -1,0 +1,2434 @@
+openapi: 3.1.0
+info:
+  title: Lifterclub API
+  version: v1
+  summary: An open workout log you and your apps can read and write.
+  description: |
+    The REST API over a user's Lifterclub workout log. Workouts are Open Workout Schema v0
+    documents (https://openworkout.dev/schema/v0/workout.json).
+
+    Errors are RFC 9457 problem details (`application/problem+json`). Their `code` is the same
+    error code the Lifterclub MCP tools use. Authentication failures (401, and 403 for a missing
+    scope) are RFC 6750 bearer errors with a `WWW-Authenticate` header instead.
+
+    Reads and writes are each limited per account, shared with MCP: 600 reads and 60 writes a
+    minute. Each app also has a budget across all its users: 6,000 reads and 600 writes a minute,
+    ten times that for a verified partner. Over either, requests get 429 with `Retry-After`.
+
+    Requests that create things take an `Idempotency-Key` header: a retry with the same key
+    within 24 hours returns the first result with `Idempotent-Replayed: true` and stores nothing
+    new.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: https://api.lifterclub.com
+security:
+  - oauth2: []
+
+tags:
+  - name: Workouts
+  - name: Webhooks
+  - name: Sets and entries
+  - name: History
+  - name: Profile
+  - name: Routines
+  - name: Programs
+  - name: Imports
+  - name: Partners
+
+paths:
+  /v1/me:
+    get:
+      operationId: getMe
+      summary: The signed-in user
+      tags: [Profile]
+      security: [{ oauth2: [profile:read] }]
+      responses:
+        "200":
+          description: The user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/workouts:
+    get:
+      operationId: listWorkouts
+      summary: List workouts, newest first
+      description: Totals cover the workouts on this page.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:read] }]
+      parameters:
+        - { name: from, in: query, description: First day, YYYY-MM-DD in the user's timezone. Default 30 days before `to`., schema: { type: string, format: date } }
+        - { name: to, in: query, description: Last day, inclusive. Default today., schema: { type: string, format: date } }
+        - { name: exercise, in: query, description: Only workouts with this exercise (name or ID), showing just its entries., schema: { type: string } }
+        - { name: limit, in: query, description: Workouts per page., schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: cursor, in: query, description: "`next_cursor` from the previous page.", schema: { type: string } }
+        - { name: updated_since, in: query, description: "The change feed: every workout whose stored record changed at or after this time, oldest change first, ignoring `from`, `to` and `exercise`. For mirroring a log; see `include_deleted`.", schema: { type: string, format: date-time } }
+        - { name: include_deleted, in: query, description: "With `updated_since`, also list the workouts deleted since then, as tombstones in `deleted`.", schema: { type: boolean, default: false } }
+      responses:
+        "200":
+          description: A page of workouts.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkoutList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createWorkout
+      summary: Log a workout
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkoutInput" }
+      responses:
+        "201": { $ref: "#/components/responses/Created" }
+        "200": { $ref: "#/components/responses/Replayed" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound", description: "A workout with this `external_id` was deleted here and stays deleted." }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/workouts/from-text:
+    post:
+      operationId: createWorkoutFromText
+      summary: Log a workout from the user's words
+      description: Lifterclub parses the text, e.g. "squat 5x5 at 225, bench 3x8 at 185", and saves it.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TextRequest" }
+      responses:
+        "201": { $ref: "#/components/responses/Created" }
+        "200": { $ref: "#/components/responses/Replayed" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/workouts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getWorkout
+      summary: Get a workout
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The workout.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      operationId: updateWorkout
+      summary: Change a workout's title, date or notes, or finish it
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WorkoutPatch" }
+      responses:
+        "200": { $ref: "#/components/responses/Written" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteWorkout
+      summary: Delete a workout
+      description: Returns an undo token that restores it for 10 minutes.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "200": { $ref: "#/components/responses/Deleted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/workouts/{id}/sets:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: A workout ID, or `current` for the session in progress (started if there is none in the last 4 hours).
+        schema: { type: string }
+    post:
+      operationId: addWorkoutSets
+      summary: Add sets for an exercise
+      description: Sets for an exercise the workout already has join its entry.
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddSetsRequest" }
+      responses:
+        "201": { $ref: "#/components/responses/Written" }
+        "200": { $ref: "#/components/responses/Replayed" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/entries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    patch:
+      operationId: updateEntry
+      summary: Confirm an entry's exercise, or change its notes
+      description: Setting `exercise_id` resolves `needs_confirmation`, and Lifterclub remembers what the user meant.
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EntryPatch" }
+      responses:
+        "200": { $ref: "#/components/responses/Written" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteEntry
+      summary: Delete an exercise entry with its sets
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "200": { $ref: "#/components/responses/Deleted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/entries/{id}/sets:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: addEntrySets
+      summary: Add sets to an exercise entry
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/EntrySetsRequest" }
+      responses:
+        "201": { $ref: "#/components/responses/Written" }
+        "200": { $ref: "#/components/responses/Replayed" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/sets/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    patch:
+      operationId: updateSet
+      summary: Change a set
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetPatch" }
+      responses:
+        "200": { $ref: "#/components/responses/Written" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteSet
+      summary: Delete a set
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "200": { $ref: "#/components/responses/Deleted" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/undo:
+    post:
+      operationId: undo
+      summary: Restore what a delete removed
+      tags: [Sets and entries]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UndoRequest" }
+      responses:
+        "200": { $ref: "#/components/responses/Written" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "410":
+          description: The undo token is unknown, already used or expired.
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/parse:
+    post:
+      operationId: parse
+      summary: Parse text into a draft without saving it
+      description: |
+        For showing the user what will be logged before saving. The text goes to Lifterclub's
+        parser (an LLM), so this needs the user's health-data consent like a write and counts
+        against the write limit.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 2000 }
+      responses:
+        "200":
+          description: The draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Draft" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/programs:
+    get:
+      operationId: listPrograms
+      summary: Browse the program library
+      description: |
+        Curated workouts and multi-week programs, ordered by ID, never by popularity. Retired and
+        withdrawn entries aren't listed. Entries are served for a person to use, not to republish:
+        paging is bounded and there's no bulk export.
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      parameters:
+        - { name: q, in: query, description: Words from the name or description., schema: { type: string } }
+        - { name: days_per_week, in: query, schema: { type: integer, minimum: 1, maximum: 7 } }
+        - { name: level, in: query, schema: { type: string, enum: [beginner, intermediate, advanced] } }
+        - { name: equipment, in: query, schema: { type: string, enum: [barbell, bench, bodyweight, cable, dumbbell, machine, pull-up-bar] } }
+        - { name: limit, in: query, description: "Default 50, at most 100.", schema: { type: integer, minimum: 1 } }
+        - { name: cursor, in: query, description: The last page's `next_cursor`., schema: { type: string } }
+      responses:
+        "200":
+          description: A page of entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [programs]
+                properties:
+                  programs:
+                    type: array
+                    items: { $ref: "#/components/schemas/ProgramSummary" }
+                  next_cursor: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/programs/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string }, description: "An entry's ID, like lcp:push-pull-legs." }
+    get:
+      operationId: getProgram
+      summary: One entry, with its latest version's structure
+      description: A retired entry can still be read. A withdrawn one is not found.
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      responses:
+        "200":
+          description: The entry.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Program" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/programs/{id}/versions/{version}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+      - { name: version, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getProgramVersion
+      summary: One published version of an entry
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      responses:
+        "200":
+          description: The version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgramVersion" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/programs/{id}/save-to-routines:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: saveProgramToRoutines
+      summary: Copy one day of an entry into the user's routines
+      description: |
+        Flattened to a routine's shape, with no loads. The copy is the user's, credited through
+        `source`. If the entry is later withdrawn the copy stays and the credit goes. Needs
+        health-data consent, like any routine.
+      tags: [Programs]
+      security: [{ oauth2: [workouts:write] }]
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveToRoutinesInput" }
+      responses:
+        "200":
+          description: Replayed from an earlier request with this key.
+          headers:
+            Idempotent-Replayed: { schema: { type: string } }
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Routine" }
+        "201":
+          description: The new routine.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Routine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-enrollments:
+    get:
+      operationId: listProgramEnrollments
+      summary: The user's runs of programs, newest first
+      description: Reading needs no consent. A withdrawn entry's run says only that, in `notice`.
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      responses:
+        "200":
+          description: The runs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [enrollments]
+                properties:
+                  enrollments:
+                    type: array
+                    items: { $ref: "#/components/schemas/ProgramEnrollment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: startProgramEnrollment
+      summary: Start following a program
+      description: |
+        One at a time. Needs health-data consent. A single workout needs no enrolment. A listing-only
+        entry takes `routine_ids`: the user's own routines, which stay private.
+      tags: [Programs]
+      security: [{ oauth2: [programs:write] }]
+      parameters:
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProgramEnrollmentInput" }
+      responses:
+        "200":
+          description: Replayed from an earlier request with this key.
+          headers:
+            Idempotent-Replayed: { schema: { type: string } }
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgramEnrollment" }
+        "201":
+          description: The new run.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgramEnrollment" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-enrollments/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    patch:
+      operationId: changeProgramEnrollment
+      summary: End a run, change its version or set its swaps
+      description: A new version affects later sessions only; workouts keep the version they were linked on.
+      tags: [Programs]
+      security: [{ oauth2: [programs:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProgramEnrollmentChange" }
+      responses:
+        "200":
+          description: The run.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgramEnrollment" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-enrollments/{id}/progress:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getProgramEnrollmentProgress
+      summary: How a run is going
+      description: |
+        Recent sessions as written, changed or partly done, computed when read, and lift progress and
+        records during the run, by the same rules as `/v1/progress` and `/v1/records`. In calm mode,
+        counts, lifts, records and differences are left out.
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      responses:
+        "200":
+          description: The run's progress.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgramProgress" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-enrollments/{id}/targets:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getProgramEnrollmentTargets
+      summary: Suggested weights for a run's days
+      description: |
+        Worked out when read from the program's rules, the user's starting numbers and what they logged in
+        the run. Each says how it was worked out. Never stored, and never performed work. Show them as
+        suggestions the user can change.
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      responses:
+        "200":
+          description: The targets.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProgramTargets" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-suggestions:
+    get:
+      operationId: getProgramSuggestions
+      summary: At most one program the user's workouts look like
+      description: |
+        Deterministic, from confirmed exercises and how often they recur. Nothing is linked until
+        accepted. Empty with suggestions off. Don't push these at people: show them quietly, or only
+        when asked. `import_id` looks only at one import's workouts.
+      tags: [Programs]
+      security: [{ oauth2: [programs:read] }]
+      parameters:
+        - { name: import_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: The suggestion, if any.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions]
+                properties:
+                  suggestions:
+                    type: array
+                    items: { $ref: "#/components/schemas/ProgramSuggestion" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-suggestions/{program_id}/accept:
+    parameters:
+      - { name: program_id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: acceptProgramSuggestion
+      summary: Link the matching workouts in one action
+      description: Needs consent. The workouts and records don't change. Not found if the program no longer matches.
+      tags: [Programs]
+      security: [{ oauth2: [programs:write] }]
+      parameters:
+        - { name: import_id, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: What was linked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [program_id, workout_ids, summary]
+                properties:
+                  program_id: { type: string }
+                  workout_ids: { type: array, items: { type: string } }
+                  summary: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-suggestions/{program_id}/undo:
+    parameters:
+      - { name: program_id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: undoProgramSuggestion
+      summary: Remove the links accepting made
+      description: Only links a suggestion made. Links the user made themselves stay.
+      tags: [Programs]
+      security: [{ oauth2: [programs:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UndoSuggestionInput" }
+      responses:
+        "204": { description: Done. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/program-suggestions/{program_id}/dismiss:
+    parameters:
+      - { name: program_id, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: dismissProgramSuggestion
+      summary: Never suggest this program again
+      tags: [Programs]
+      security: [{ oauth2: [programs:write] }]
+      responses:
+        "204": { description: Done. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/workouts/{id}/program-link:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setWorkoutProgramLink
+      summary: Say which program day a workout was
+      description: A label. The workout, its sets and its records don't change. Needs consent.
+      tags: [Programs]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProgramRef" }
+      responses:
+        "200":
+          description: The workout.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: removeWorkoutProgramLink
+      summary: Take a workout out of its program
+      description: Records and history don't change. Needs no consent.
+      tags: [Programs]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "200":
+          description: The workout.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Workout" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/routines/parse:
+    post:
+      operationId: parseRoutine
+      summary: Read a pasted routine into a draft without saving it
+      description: |
+        Each training day becomes one routine. The numbers are targets, not work done, and every
+        one comes from the text. The text goes to Lifterclub's parser (an LLM), so this needs the
+        user's health-data consent and counts against the write limit.
+      tags: [Routines]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoutineTextRequest" }
+      responses:
+        "200":
+          description: The draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoutineDraft" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/partners:
+    get:
+      operationId: listPartners
+      summary: The apps Lifterclub has verified
+      description: Public, with no token and no limit. A verified partner was checked by a Lifterclub owner; nothing is verified by registering. The listing says nothing about who uses an app.
+      tags: [Partners]
+      security: []
+      responses:
+        "200":
+          description: The verified apps, by name.
+          headers:
+            Cache-Control:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PartnerList" }
+
+  /v1/webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List this app's webhooks on the account
+      description: Without secrets. A webhook belongs to the grant the token came from, so each app sees only its own.
+      tags: [Webhooks]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The app's subscriptions.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WebhookList" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createWebhook
+      summary: Be told when the log changes
+      description: "Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume."
+      tags: [Webhooks]
+      security: [{ oauth2: [workouts:read] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookInput" }
+      responses:
+        "201":
+          description: Subscribed. `Location` names the subscription.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Webhook" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/webhooks/{id}:
+    delete:
+      operationId: deleteWebhook
+      summary: End a webhook
+      tags: [Webhooks]
+      security: [{ oauth2: [workouts:read] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/export:
+    get:
+      operationId: exportLog
+      summary: Download the whole log
+      description: |
+        Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts
+        and the routines, plus the profile if the credential has `profile:read`. `csv` has one row per
+        set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run
+        it. Deleted workouts aren't part of the log. Limited to 10 an hour per account. If it fails
+        part way the connection is cut, so an incomplete file never looks finished.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:read] }]
+      parameters:
+        - { name: format, in: query, schema: { type: string, enum: [json, csv], default: json } }
+      responses:
+        "200":
+          description: The file, sent as an attachment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogExport" }
+            text/csv:
+              schema: { type: string }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /v1/routines:
+    get:
+      operationId: listRoutines
+      summary: The user's saved routines, by name
+      tags: [Routines]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The routines.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [routines]
+                properties:
+                  routines:
+                    type: array
+                    items: { $ref: "#/components/schemas/Routine" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createRoutine
+      summary: Save a routine
+      description: |
+        An exercise sent by name alone uses the exercise it matches for certain; anything else
+        becomes one of the user's own exercises, so a routine can always be started.
+      tags: [Routines]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoutineInput" }
+      responses:
+        "201":
+          description: The saved routine.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Routine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/routines/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getRoutine
+      summary: One saved routine
+      tags: [Routines]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The routine.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Routine" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    put:
+      operationId: updateRoutine
+      summary: Replace a routine
+      description: Replaces its name, notes and exercises. Its ID and credit stay.
+      tags: [Routines]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RoutineInput" }
+      responses:
+        "200":
+          description: The routine.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Routine" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteRoutine
+      summary: Delete a routine
+      description: Workouts already logged are not touched.
+      tags: [Routines]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/phrases:
+    get:
+      operationId: listPhrases
+      summary: What the matcher has learned for this person
+      tags: [History]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: Learned phrases.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [phrases]
+                properties:
+                  phrases:
+                    type: array
+                    items:
+                      type: object
+                      required: [phrase, exercise_id, exercise_name]
+                      properties:
+                        phrase: { type: string }
+                        exercise_id: { type: string }
+                        exercise_name: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/phrases/{phrase}:
+    parameters:
+      - { name: phrase, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: deletePhrase
+      summary: Forget a learned phrase
+      description: Workouts already logged keep their exercise.
+      tags: [History]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "204": { description: Forgotten. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/records:
+    get:
+      operationId: getRecords
+      summary: Current personal records
+      tags: [History]
+      security: [{ oauth2: [workouts:read] }]
+      parameters:
+        - { name: exercise, in: query, description: One exercise (name or ID); leave out for all., schema: { type: string } }
+      responses:
+        "200":
+          description: The records.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RecordList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/progress:
+    get:
+      operationId: getProgress
+      summary: One metric for one exercise over time
+      tags: [History]
+      security: [{ oauth2: [workouts:read] }]
+      parameters:
+        - { name: exercise, in: query, required: true, description: Exercise name or ID., schema: { type: string } }
+        - name: metric
+          in: query
+          required: true
+          description: "`e1rm` (estimated one-rep max, Epley), `top_set` (heaviest set) or `volume` (load × reps per session)."
+          schema: { enum: [e1rm, top_set, volume] }
+        - { name: from, in: query, description: First day. Default 90 days before `to`., schema: { type: string, format: date } }
+        - { name: to, in: query, description: Last day. Default today., schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: One point per session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Progress" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/Unprocessable" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/exercises:
+    get:
+      operationId: searchExercises
+      summary: Search the catalogue and the user's custom exercises
+      tags: [History]
+      security: [{ oauth2: [workouts:read] }]
+      parameters:
+        - { name: query, in: query, required: true, description: Name or shorthand, e.g. "rdl"., schema: { type: string } }
+        - { name: equipment, in: query, schema: { type: string } }
+        - { name: muscle, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 25, default: 10 } }
+      responses:
+        "200":
+          description: Best matches first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exercises]
+                properties:
+                  exercises:
+                    type: array
+                    items: { $ref: "#/components/schemas/ExerciseMatch" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: createExercise
+      summary: Make one of the user's own exercises
+      description: |
+        For an exercise the catalogue lacks (FR-4.4). It's visible only to this user and matched
+        by its name from then on. If the user already has one by that name, it's returned (200).
+      tags: [History]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExerciseRequest" }
+      responses:
+        "201":
+          description: Made.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseMatch" }
+        "200":
+          description: The user's existing exercise with that name.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExerciseMatch" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/exercises/{id}/last-sets:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: An exercise ID, e.g. `oec:barbell-bench-press`.
+        schema: { type: string }
+    get:
+      operationId: getLastSets
+      summary: What the user did the last time they did an exercise
+      tags: [History]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The sets, or none if the exercise was never logged.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LastSets" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/imports:
+    post:
+      operationId: uploadImport
+      summary: Upload an export from another app and preview it
+      description: |
+        An export, up to 32 MB (larger ones go through `POST /v1/imports/uploads`), as
+        multipart/form-data in a field named `file`: a Strong or Hevy
+        CSV, or cardio activities as FIT, GPX or TCX files (FR-8.2), alone, gzipped or zipped, as
+        in Garmin's and Strava's exports. Each activity becomes a workout with an entry per sport
+        holding its moving time and distance. The kind of file is told from its content, not its
+        name. It's stored and previewed; nothing is imported until the import is started. Needs
+        the user's health-data consent.
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Stored and previewed.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    get:
+      operationId: listImports
+      summary: Recent imports, newest first
+      tags: [Imports]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: Up to 20 imports.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imports]
+                properties:
+                  imports:
+                    type: array
+                    items: { $ref: "#/components/schemas/ImportJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/imports/uploads:
+    post:
+      operationId: startImportUpload
+      summary: Start uploading a large export straight to storage
+      description: |
+        For exports over 32 MB, up to 16 GB: a full Garmin or Strava archive. The response has
+        the import (status `uploading`) and a Cloud Storage resumable upload session: send the
+        file there with `PUT` requests of `chunk_size` bytes (the last may be shorter), each
+        with `Content-Range: bytes FIRST-LAST/SIZE`. Cloud Storage answers `308` until the last
+        chunk and `200` or `201` after it. After a failed request, `PUT` with no body and
+        `Content-Range: bytes */SIZE` to learn how much arrived (`308` with `Range: bytes=0-N`;
+        no `Range` means nothing did), then carry on from there. The session URL is the
+        credential for that one file: keep it private. It lasts a week, but an import not
+        uploaded within a day is cancelled. Then call `POST /v1/imports/{id}/uploaded`.
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportUploadRequest" }
+      responses:
+        "201":
+          description: Ready to upload.
+          headers:
+            Location: { $ref: "#/components/headers/Location" }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [import, upload]
+                properties:
+                  import: { $ref: "#/components/schemas/ImportJob" }
+                  upload:
+                    type: object
+                    required: [url, chunk_size]
+                    properties:
+                      url: { type: string, format: uri, description: The Cloud Storage resumable upload session. }
+                      chunk_size: { type: integer, description: Bytes per request, a multiple of 256 KiB. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/imports/{id}/uploaded:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: finishImportUpload
+      summary: Say an upload is complete, to preview it
+      description: |
+        The worker reads the export (status `previewing`; a large archive takes a minute or
+        more), then the import is `previewed` with its `preview`, or `failed` with `error` if the
+        file can't be read. Poll `GET /v1/imports/{id}`. A file that hasn't finished uploading
+        is `invalid_input`.
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "202":
+          description: Being previewed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/imports/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getImport
+      summary: An import, with its preview and choices
+      tags: [Imports]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The import.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      operationId: updateImport
+      summary: Choose units and map exercise names, before starting
+      description: |
+        Units apply when the file doesn't name its own. A mapping sends every row with that
+        exercise name to an exercise (FR-8.5); null removes it. Names without a mapping use
+        their confirmed match, or are imported as needing confirmation.
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ImportPatch" }
+      responses:
+        "200":
+          description: The import with its new choices.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: cancelImport
+      summary: Cancel an import that hasn't started, and delete its file
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "204": { description: Cancelled. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/imports/{id}/start:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: startImport
+      summary: Start a previewed import
+      description: |
+        Runs in the background; `stats` shows progress (FR-8.6). Workouts imported from the app
+        before are skipped, and exercise mappings are remembered for logging too.
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "202":
+          description: Queued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/imports/{id}/undo:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: undoImport
+      summary: Undo a finished or failed import
+      description: |
+        Deletes every workout it stored (including ones edited since) and rebuilds records. The same
+        file can then be imported again. A failed import may have stored some workouts before it stopped.
+      tags: [Imports]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "200":
+          description: Undone.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ImportJob" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/profile:
+    get:
+      operationId: getProfile
+      summary: The user's training profile
+      tags: [Profile]
+      security: [{ oauth2: [profile:read] }]
+      responses:
+        "200":
+          description: The profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      operationId: updateProfile
+      summary: Change profile fields
+      description: |
+        Fields given replace the old values; others stay. Goals, equipment, limitations and
+        training days need the user's health-data consent.
+      tags: [Profile]
+      security: [{ oauth2: [profile:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfilePatch" }
+      responses:
+        "200":
+          description: The updated profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Profile" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.1 with PKCE (S256). Register at /oauth/register (RFC 7591) or use a client ID
+        metadata document. Request tokens for the resource `https://api.lifterclub.com` (RFC 8707).
+      flows:
+        authorizationCode:
+          authorizationUrl: https://api.lifterclub.com/oauth/authorize
+          tokenUrl: https://api.lifterclub.com/oauth/token
+          refreshUrl: https://api.lifterclub.com/oauth/token
+          scopes:
+            workouts:read: See workouts, progress and personal records
+            workouts:write: Add, change and delete workouts
+            profile:read: See the profile
+            profile:write: Change the profile
+            programs:read: See training programs
+            programs:write: Create and change training programs
+
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Any unique string, up to 200 characters. Retrying with the same key never writes twice.
+      schema: { type: string, maxLength: 200 }
+
+  headers:
+    Location:
+      description: The workout's URL.
+      schema: { type: string }
+    IdempotentReplayed:
+      description: "`true` when the response replays an earlier request with the same Idempotency-Key."
+      schema: { type: string, enum: ["true"] }
+    RetryAfter:
+      description: Seconds to wait.
+      schema: { type: integer }
+
+  responses:
+    Created:
+      description: Stored.
+      headers:
+        Location: { $ref: "#/components/headers/Location" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Logged" }
+    Replayed:
+      description: An earlier request with the same Idempotency-Key; nothing new was stored.
+      headers:
+        Idempotent-Replayed: { $ref: "#/components/headers/IdempotentReplayed" }
+        Location: { $ref: "#/components/headers/Location" }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Logged" }
+    Written:
+      description: The workout after the change.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Logged" }
+    Deleted:
+      description: Deleted, with an undo token.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Deleted" }
+    BadRequest:
+      description: "`invalid_input`: `field` names what to fix."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unauthorized:
+      description: Missing, invalid or expired token, or the account no longer exists.
+      headers:
+        WWW-Authenticate:
+          description: Points at the protected resource metadata.
+          schema: { type: string }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BearerError" }
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: |
+        The token lacks the scope (a bearer error), or the user hasn't given health-data consent
+        (`consent_required`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/BearerError" }
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: "`not_found`: no such resource in this account."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Unprocessable:
+      description: "`nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    RateLimited:
+      description: "`rate_limited`."
+      headers:
+        Retry-After: { $ref: "#/components/headers/RetryAfter" }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+    Workout:
+      # Relative, so the spec works offline and in code generators; published alongside it.
+      $ref: "../schema/v0/workout.json"
+    Set:
+      $ref: "../schema/v0/workout.json#/$defs/set"
+    Load:
+      $ref: "../schema/v0/workout.json#/$defs/load"
+    MatchStatus:
+      description: catalogue and custom are confirmed; close and unmatched need confirmation.
+      enum: [catalogue, close, custom, unmatched]
+    Unit:
+      enum: [kg, lb]
+    Date:
+      type: string
+      format: date
+
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code:
+          enum: [invalid_input, consent_required, nothing_to_log, parse_unsure, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
+        field: { type: string, description: For invalid_input. }
+        candidates:
+          type: array
+          description: For exercise_ambiguous.
+          items: { $ref: "#/components/schemas/Candidate" }
+        warnings:
+          type: array
+          description: For nothing_to_log and parse_unsure.
+          items: { $ref: "#/components/schemas/Warning" }
+    BearerError:
+      type: object
+      required: [error]
+      properties:
+        error: { enum: [invalid_request, invalid_token, insufficient_scope, server_error] }
+        error_description: { type: string }
+
+    Me:
+      type: object
+      required: [id, email, display_name, unit_system, timezone, calm_mode, onboarded, health_consent]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        unit_system: { enum: [metric, imperial] }
+        timezone: { type: string }
+        calm_mode: { type: boolean, description: Hide records, totals and progress numbers. }
+        onboarded: { type: boolean, description: The account has finished its setup form. }
+        health_consent: { type: boolean, description: Health-data consent is in force; writes need it. }
+
+    WorkoutList:
+      type: object
+      required: [workouts, totals, truncated, summary]
+      properties:
+        from: { $ref: "#/components/schemas/Date", description: First day listed; absent in the change feed. }
+        to: { $ref: "#/components/schemas/Date", description: Last day listed; absent in the change feed. }
+        exercise: { type: string, description: The exercise filter's name. }
+        workouts:
+          type: array
+          items: { $ref: "#/components/schemas/Workout" }
+        updated_since: { type: string, format: date-time, description: The change feed's start, when listing by `updated_since`. }
+        deleted:
+          type: array
+          description: Workouts deleted since `updated_since`, when `include_deleted` was asked for.
+          items: { $ref: "#/components/schemas/Tombstone" }
+        totals: { $ref: "#/components/schemas/Totals" }
+        truncated: { type: boolean, description: More workouts follow; pass next_cursor. }
+        next_cursor: { type: string }
+        summary: { type: string }
+    WebhookInput:
+      type: object
+      required: [url, events]
+      properties:
+        url: { type: string, maxLength: 2048, description: "An https URL on a public host, with no credentials. Checked again on every delivery, on the address actually reached." }
+        events:
+          type: array
+          minItems: 1
+          items: { type: string, enum: [workout.created, workout.updated, workout.deleted] }
+    Webhook:
+      type: object
+      required: [id, url, events, created_at, consecutive_failures]
+      properties:
+        id: { type: string }
+        url: { type: string }
+        events:
+          type: array
+          items: { type: string, enum: [workout.created, workout.updated, workout.deleted] }
+        created_at: { type: string, format: date-time }
+        paused_at: { type: string, format: date-time, description: Set after ten failed deliveries in a row. Nothing is delivered until the app subscribes again. }
+        last_delivered_at: { type: string, format: date-time }
+        last_status: { type: integer, description: "The endpoint's last HTTP status; 0 when it couldn't be reached." }
+        consecutive_failures: { type: integer }
+        secret: { type: string, description: "Only in the creation response: the key the deliveries are signed with. `Lifterclub-Signature` is `t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">`." }
+    PartnerList:
+      type: object
+      required: [partners]
+      properties:
+        partners:
+          type: array
+          items: { $ref: "#/components/schemas/Partner" }
+    Partner:
+      type: object
+      required: [name, url, verified_at]
+      properties:
+        name: { type: string }
+        url: { type: string, description: "The app's own site, as it registered it; empty if it gave none." }
+        verified_at: { type: string, format: date-time }
+    WebhookList:
+      type: object
+      required: [webhooks]
+      properties:
+        webhooks:
+          type: array
+          items: { $ref: "#/components/schemas/Webhook" }
+    Tombstone:
+      type: object
+      description: A deleted workout in the change feed, enough to remove a mirror's copy and nothing of what it held.
+      required: [id, deleted_at, updated_at]
+      properties:
+        id: { type: string }
+        deleted_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        merged_into: { type: string, description: The workout it was merged into, when another app's record of the same session absorbed it. }
+    Totals:
+      type: object
+      description: Working sets on this page.
+      required: [workouts, sets, volume, unit]
+      properties:
+        workouts: { type: integer }
+        sets: { type: integer }
+        volume: { type: number, description: Sum of load × reps. }
+        unit: { $ref: "#/components/schemas/Unit" }
+
+    Logged:
+      type: object
+      description: The result of a write.
+      required: [workout, summary, new_records, needs_confirmation]
+      properties:
+        workout: { $ref: "#/components/schemas/Workout" }
+        summary: { type: string, description: One line to show the user. }
+        new_records:
+          type: array
+          items: { $ref: "#/components/schemas/Record" }
+        needs_confirmation:
+          type: array
+          items: { $ref: "#/components/schemas/Confirmation" }
+        replayed: { type: boolean }
+        parse_method: { type: string, description: "How text was read, for a write made from text: llm or fallback." }
+        warnings:
+          type: array
+          description: For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out.
+          items: { $ref: "#/components/schemas/Warning" }
+    Record:
+      type: object
+      description: A personal record the write changed.
+      required: [exercise_id, exercise_name, kind, value, unit, set_id]
+      properties:
+        exercise_id: { type: string }
+        exercise_name: { type: string }
+        kind: { $ref: "#/components/schemas/RecordKind" }
+        value: { type: number }
+        unit: { $ref: "#/components/schemas/Unit" }
+        previous: { type: number, description: Absent for a first record. }
+        set_id: { type: string, format: uuid }
+        removed: { type: boolean, description: No set qualifies any more; value is 0. }
+    RecordKind:
+      enum: [heaviest_load, best_e1rm, best_set_volume]
+    Confirmation:
+      type: object
+      description: An exercise to confirm with the user, then fix with PATCH /v1/entries/{entry_id}.
+      required: [entry_id, text, status, candidates]
+      properties:
+        entry_id: { type: string, format: uuid }
+        text: { type: string }
+        status: { $ref: "#/components/schemas/MatchStatus" }
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/Candidate" }
+    Candidate:
+      type: object
+      required: [id, name, measurement_type, is_custom, score]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        measurement_type: { $ref: "#/components/schemas/MeasurementType" }
+        is_custom: { type: boolean }
+        score: { type: number }
+    MeasurementType:
+      enum: [weight_reps, reps, duration, distance_duration, assisted_weight_reps]
+    Deleted:
+      type: object
+      required: [kind, id, undo_token, undo_expires_at, records_changed, summary]
+      properties:
+        kind: { enum: [workout, exercise, set] }
+        id: { type: string, format: uuid }
+        undo_token: { type: string }
+        undo_expires_at: { type: string, format: date-time }
+        records_changed:
+          type: array
+          items: { $ref: "#/components/schemas/Record" }
+        summary: { type: string }
+
+    Draft:
+      type: object
+      description: Parsed text, not saved.
+      required: [text, method, exercises, warnings]
+      properties:
+        text: { type: string }
+        method: { enum: [llm, fallback, none] }
+        date: { $ref: "#/components/schemas/Date", description: The day the text names; left out when it names none or the day couldn't be read. }
+        date_text: { type: string, description: The words the text names the day with. }
+        exercises:
+          type: array
+          items: { $ref: "#/components/schemas/DraftExercise" }
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/Warning" }
+    DraftExercise:
+      type: object
+      required: [text, sets, match]
+      properties:
+        text: { type: string }
+        sets:
+          type: array
+          items: { $ref: "#/components/schemas/DraftSet" }
+        notes: { type: string }
+        match: { $ref: "#/components/schemas/Match" }
+    DraftSet:
+      type: object
+      required: [reps, load, unit, rpe, duration_s, distance_m, warmup, unit_assumed]
+      properties:
+        reps: { type: [integer, "null"] }
+        load: { type: [number, "null"] }
+        unit: { oneOf: [{ $ref: "#/components/schemas/Unit" }, { type: "null" }] }
+        rpe: { type: [number, "null"] }
+        duration_s: { type: [integer, "null"] }
+        distance_m: { type: [number, "null"] }
+        warmup: { type: boolean }
+        unit_assumed: { type: boolean, description: The user's default unit was applied. }
+    RoutineDraft:
+      type: object
+      description: A pasted routine read into targets, not saved.
+      required: [text, method, routines, warnings]
+      properties:
+        text: { type: string }
+        method: { enum: [llm, fallback, none] }
+        routines:
+          type: array
+          items:
+            type: object
+            required: [name, exercises]
+            properties:
+              name: { type: string, description: The heading as written; empty when there is none. }
+              exercises:
+                type: array
+                items: { $ref: "#/components/schemas/RoutineDraftExercise" }
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/Warning" }
+    RoutineDraftExercise:
+      type: object
+      required: [text, sets, reps_min, reps_max, load, unit, duration_s, distance_m, rest_seconds, notes, unit_assumed, match]
+      properties:
+        text: { type: string }
+        sets: { type: [integer, "null"] }
+        reps_min: { type: [integer, "null"] }
+        reps_max: { type: [integer, "null"] }
+        load: { type: [number, "null"] }
+        unit: { oneOf: [{ $ref: "#/components/schemas/Unit" }, { type: "null" }] }
+        duration_s: { type: [integer, "null"] }
+        distance_m: { type: [number, "null"] }
+        rest_seconds: { type: [integer, "null"] }
+        notes: { type: [string, "null"] }
+        unit_assumed: { type: boolean, description: The user's default unit was applied. }
+        match: { $ref: "#/components/schemas/Match" }
+    RoutineInput:
+      type: object
+      required: [name, exercises]
+      additionalProperties: false
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        notes: { type: string }
+        exercises:
+          type: array
+          minItems: 1
+          maxItems: 40
+          items: { $ref: "#/components/schemas/RoutineExerciseInput" }
+    RoutineTextRequest:
+      type: object
+      required: [text]
+      additionalProperties: false
+      properties:
+        text: { type: string, maxLength: 10000 }
+    RoutineExerciseInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name: { type: string, description: As the user wrote it. Needed without exercise_id. }
+        exercise_id: { type: string }
+        sets: { type: integer, minimum: 1 }
+        reps_min: { type: integer, minimum: 1 }
+        reps_max: { type: integer, minimum: 1 }
+        load: { type: number, exclusiveMinimum: 0 }
+        unit: { $ref: "#/components/schemas/Unit" }
+        duration_s: { type: integer, minimum: 0 }
+        distance_m: { type: number, minimum: 0 }
+        rest_seconds: { type: integer, minimum: 0 }
+        notes: { type: string }
+    LogExport:
+      type: object
+      required: [exported_at, routines, program_enrollments, program_suggestions_dismissed, workouts]
+      properties:
+        exported_at: { type: string, format: date-time }
+        profile: { $ref: "#/components/schemas/Profile" }
+        routines:
+          type: array
+          items: { $ref: "#/components/schemas/Routine" }
+        program_suggestions_dismissed: { type: array, items: { type: string } }
+        program_enrollments:
+          type: array
+          items: { $ref: "#/components/schemas/ProgramEnrollment" }
+        workouts:
+          type: array
+          items: { $ref: "#/components/schemas/Workout" }
+    ProgramNumber:
+      type: object
+      required: [value, unit]
+      properties:
+        value: { type: number }
+        unit: { type: string, enum: [kg, lb] }
+    ProgramTargets:
+      type: object
+      required: [label, days]
+      properties:
+        label: { type: string }
+        days:
+          type: array
+          items:
+            type: object
+            required: [day, day_name, targets]
+            properties:
+              day: { type: string }
+              day_name: { type: string }
+              targets:
+                type: array
+                items:
+                  type: object
+                  required: [exercise_id, exercise_name, explanation, needs_start]
+                  properties:
+                    exercise_id: { type: string }
+                    exercise_name: { type: string }
+                    load: { $ref: "#/components/schemas/ProgramNumber" }
+                    explanation: { type: string }
+                    needs_start: { type: boolean }
+    UndoSuggestionInput:
+      type: object
+      required: [workout_ids]
+      properties:
+        workout_ids: { type: array, items: { type: string } }
+    ProgramSuggestion:
+      type: object
+      required: [program_id, name, credit, is_authorized, disclaimer, version, workouts]
+      properties:
+        program_id: { type: string }
+        name: { type: string }
+        credit: { type: [string, "null"] }
+        is_authorized: { type: boolean }
+        disclaimer: { type: [string, "null"] }
+        version: { type: integer }
+        workouts:
+          type: array
+          items:
+            type: object
+            required: [workout_id, started_at, day, day_name]
+            properties:
+              workout_id: { type: string }
+              started_at: { type: string, format: date-time }
+              day: { type: string }
+              day_name: { type: string }
+    ProgramRef:
+      type: object
+      required: [id]
+      properties:
+        id: { type: string }
+        version: { type: integer }
+        day: { type: string }
+    ProgramEnrollmentInput:
+      type: object
+      required: [program_id]
+      properties:
+        program_id: { type: string }
+        version: { type: integer }
+        routine_ids: { type: array, items: { type: string } }
+    ProgramSwap:
+      type: object
+      required: [exercise_id, replacement_id]
+      properties:
+        exercise_id: { type: string }
+        exercise_name: { type: string }
+        replacement_id: { type: string }
+        replacement_name: { type: string }
+    ProgramEnrollmentChange:
+      type: object
+      properties:
+        end: { type: boolean }
+        version: { type: integer }
+        swaps: { type: array, items: { $ref: "#/components/schemas/ProgramSwap" } }
+        starting_numbers:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ProgramNumber" }
+        start_from_history: { type: boolean, description: Fill in the rest from the last time each exercise was logged. }
+    ProgramEnrollment:
+      type: object
+      required: [id, program, listed, started_at, swaps, starting_numbers]
+      properties:
+        id: { type: string }
+        program:
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [id, name, kind, credit, source_url, is_authorized, disclaimer, is_listing_only]
+              properties:
+                id: { type: string }
+                name: { type: string }
+                kind: { type: string }
+                credit: { type: [string, "null"] }
+                source_url: { type: [string, "null"] }
+                is_authorized: { type: boolean }
+                disclaimer: { type: [string, "null"] }
+                is_listing_only: { type: boolean }
+        listed: { type: boolean }
+        notice: { type: string, description: Why a run ended without the user ending it. }
+        version: { type: integer }
+        latest_version: { type: integer }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+        ended_reason: { type: string, enum: [user, withdrawn] }
+        swaps: { type: array, items: { $ref: "#/components/schemas/ProgramSwap" } }
+        starting_numbers:
+          type: object
+          additionalProperties: { $ref: "#/components/schemas/ProgramNumber" }
+        routine_ids: { type: array, items: { type: string } }
+        structure: { $ref: "#/components/schemas/ProgramStructure" }
+        next_day: { type: string, description: "A suggestion only: days can be done in any order." }
+    ProgramProgress:
+      type: object
+      required: [enrollment, calm_mode, sessions, summary]
+      properties:
+        enrollment: { $ref: "#/components/schemas/ProgramEnrollment" }
+        calm_mode: { type: boolean }
+        sessions_done: { type: integer }
+        sessions:
+          type: array
+          items:
+            type: object
+            required: [workout_id, started_at]
+            properties:
+              workout_id: { type: string }
+              started_at: { type: string, format: date-time }
+              day: { type: string }
+              day_name: { type: string }
+              comparison:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [as_written, changed, partly_done] }
+                  differences:
+                    type: array
+                    items:
+                      type: object
+                      required: [kind, exercise, detail]
+                      properties:
+                        kind: { type: string, enum: [missing, fewer_sets, extra, reps, swap, unconfirmed] }
+                        exercise: { type: string }
+                        detail: { type: string }
+        lifts: { type: array, items: { $ref: "#/components/schemas/Progress" } }
+        records: { type: array, items: { $ref: "#/components/schemas/CurrentRecord" } }
+        summary: { type: string }
+    ProgramStructure:
+      $ref: "../schema/v0/program.json"
+    ProgramSummary:
+      type: object
+      required: [id, name, kind, credit, source_url, is_authorized, disclaimer, summary, level, equipment, is_listing_only]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        family: { type: string }
+        kind: { type: string, enum: [workout, program] }
+        credit: { type: [string, "null"], description: Who created it. Null for Lifterclub's own entries. }
+        source_url: { type: [string, "null"], description: Where to get the original. }
+        is_authorized: { type: boolean, description: True only with the rights holder's written permission. }
+        disclaimer: { type: [string, "null"], description: "Show this whenever you show the entry's name. Null only for our own entries and ones with permission." }
+        summary: { type: string }
+        days_per_week: { type: integer }
+        level: { type: string, enum: [beginner, intermediate, advanced] }
+        equipment: { type: array, items: { type: string } }
+        is_listing_only: { type: boolean }
+        follower_count_bucket: { type: integer, enum: [50, 100, 500, 1000, 5000], description: "At least this many people, rounded down. Absent below 50. Not a ranking." }
+        latest_version: { type: integer }
+    ProgramVersionInfo:
+      type: object
+      required: [version, published_at]
+      properties:
+        version: { type: integer }
+        source_edition: { type: string, description: Which edition of the source this reflects. }
+        changelog: { type: string }
+        published_at: { type: string, format: date-time }
+    Program:
+      type: object
+      required: [id, name, kind, credit, source_url, is_authorized, disclaimer, summary, level, equipment, is_listing_only, is_retired, versions]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        family: { type: string }
+        kind: { type: string, enum: [workout, program] }
+        credit: { type: [string, "null"], description: Who created it. Null for Lifterclub's own entries. }
+        source_url: { type: [string, "null"], description: Where to get the original. }
+        is_authorized: { type: boolean, description: True only with the rights holder's written permission. }
+        disclaimer: { type: [string, "null"], description: "Show this whenever you show the entry's name. Null only for our own entries and ones with permission." }
+        summary: { type: string }
+        days_per_week: { type: integer }
+        level: { type: string, enum: [beginner, intermediate, advanced] }
+        equipment: { type: array, items: { type: string } }
+        is_listing_only: { type: boolean }
+        follower_count_bucket: { type: integer, enum: [50, 100, 500, 1000, 5000], description: "At least this many people, rounded down. Absent below 50. Not a ranking." }
+        latest_version: { type: integer }
+        is_retired: { type: boolean }
+        versions:
+          type: array
+          items: { $ref: "#/components/schemas/ProgramVersionInfo" }
+        structure: { $ref: "#/components/schemas/ProgramStructure" }
+    ProgramVersion:
+      type: object
+      required: [version, published_at, program_id, credit, is_authorized, disclaimer, structure]
+      properties:
+        version: { type: integer }
+        source_edition: { type: string }
+        changelog: { type: string }
+        published_at: { type: string, format: date-time }
+        program_id: { type: string }
+        credit: { type: [string, "null"] }
+        is_authorized: { type: boolean }
+        disclaimer: { type: [string, "null"] }
+        structure: { $ref: "#/components/schemas/ProgramStructure" }
+    SaveToRoutinesInput:
+      type: object
+      required: [day]
+      properties:
+        day: { type: string, description: "A day's `key` from the entry's latest version." }
+    Routine:
+      type: object
+      required: [id, name, exercises, created_at]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        notes: { type: string }
+        source:
+          type: object
+          description: The library entry this was copied from. Absent once that entry is withdrawn.
+          required: [program_id, program_name, credit, version]
+          properties:
+            program_id: { type: string }
+            program_name: { type: string }
+            credit: { type: [string, "null"] }
+            version: { type: integer }
+        created_at: { type: string, format: date-time }
+        exercises:
+          type: array
+          items:
+            type: object
+            required: [exercise_id, name, equipment]
+            properties:
+              exercise_id: { type: string }
+              name: { type: string }
+              equipment: { type: array, items: { type: string } }
+              sets: { type: integer }
+              reps_min: { type: integer }
+              reps_max: { type: integer }
+              load: { type: number }
+              unit: { $ref: "#/components/schemas/Unit" }
+              duration_s: { type: integer }
+              distance_m: { type: number }
+              rest_seconds: { type: integer }
+              notes: { type: string }
+    Match:
+      type: object
+      required: [phrase, status, exercise, confidence, method, candidates]
+      properties:
+        phrase: { type: string }
+        status: { $ref: "#/components/schemas/MatchStatus" }
+        exercise:
+          oneOf: [{ $ref: "#/components/schemas/Candidate" }, { type: "null" }]
+        confidence: { type: number }
+        method: { enum: [user_phrase, exact, trigram, none] }
+        candidates:
+          type: array
+          items: { $ref: "#/components/schemas/Candidate" }
+    Warning:
+      type: object
+      required: [code]
+      properties:
+        code: { enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited] }
+        detail: { type: string }
+
+    RecordList:
+      type: object
+      required: [records, summary]
+      properties:
+        records:
+          type: array
+          items: { $ref: "#/components/schemas/CurrentRecord" }
+        summary: { type: string }
+    CurrentRecord:
+      type: object
+      required: [exercise_id, exercise_name, kind, value, unit, achieved_on, workout_id, set_id]
+      properties:
+        exercise_id: { type: string }
+        exercise_name: { type: string }
+        kind: { $ref: "#/components/schemas/RecordKind" }
+        value: { type: number }
+        unit: { $ref: "#/components/schemas/Unit" }
+        achieved_on: { $ref: "#/components/schemas/Date" }
+        workout_id: { type: string, format: uuid }
+        set_id: { type: string, format: uuid }
+        reps: { type: integer }
+        load: { $ref: "#/components/schemas/Load" }
+    Progress:
+      type: object
+      required: [exercise_id, exercise_name, metric, formula, unit, from, to, points, summary]
+      properties:
+        exercise_id: { type: string }
+        exercise_name: { type: string }
+        metric: { enum: [e1rm, top_set, volume] }
+        formula: { type: string, description: How each value is computed. }
+        unit: { $ref: "#/components/schemas/Unit" }
+        from: { $ref: "#/components/schemas/Date" }
+        to: { $ref: "#/components/schemas/Date" }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/Point" }
+        best: { $ref: "#/components/schemas/Point" }
+        change: { type: number, description: The last point minus the first. }
+        summary: { type: string }
+    Point:
+      type: object
+      required: [date, workout_id, value]
+      properties:
+        date: { $ref: "#/components/schemas/Date" }
+        workout_id: { type: string, format: uuid }
+        value: { type: number }
+        reps: { type: integer, description: For top_set. }
+    ExerciseMatch:
+      type: object
+      required: [id, name, measurement_type, equipment, primary_muscles, is_custom, score]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        measurement_type: { $ref: "#/components/schemas/MeasurementType" }
+        equipment: { type: array, items: { type: string } }
+        primary_muscles: { type: array, items: { type: string } }
+        is_custom: { type: boolean }
+        score: { type: number }
+    LastSets:
+      type: object
+      required: [exercise_id, exercise_name, workout_id, sets, summary]
+      properties:
+        exercise_id: { type: string }
+        exercise_name: { type: string }
+        workout_id: { type: [string, "null"], format: uuid, description: Null when the exercise was never logged. }
+        started_at: { type: string, format: date-time }
+        sets:
+          type: array
+          description: Every confirmed entry's sets for the exercise in that workout, in order.
+          items: { $ref: "#/components/schemas/Set" }
+        summary: { type: string }
+
+    Profile:
+      type: object
+      required: [display_name, units, timezone, goals, equipment, limitations, training_days, calm_mode, program_suggestions, program_counts, program_counts_available, health_consent, summary]
+      properties:
+        display_name: { type: string }
+        units: { $ref: "#/components/schemas/Unit" }
+        timezone: { type: string }
+        goals: { type: string }
+        equipment: { type: array, items: { type: string } }
+        limitations: { type: string, description: Injuries and movements to avoid. }
+        training_days: { type: array, items: { type: string } }
+        program_counts: { type: boolean, description: "The separate opt-in to being counted in a program's public total." }
+        program_counts_available: { type: boolean, description: "False until public counts are turned on: don't ask before then." }
+        program_suggestions: { type: boolean, description: Whether suggestions that workouts look like a known program may appear. }
+        calm_mode: { type: boolean, description: "The user hides records, totals and progress numbers; don't volunteer them." }
+        health_consent: { type: boolean, description: Whether workouts can be logged. }
+        summary: { type: string }
+
+    ImportJob:
+      type: object
+      required: [id, file_name, status, choices, stats, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        source:
+          enum: [strong, hevy, garmin, strava, other]
+          description: The app the export came from, once previewed; `other` is activity files from any other app or device.
+        file_name: { type: string }
+        status:
+          enum: [uploading, previewing, previewed, queued, importing, done, failed, cancelled, undone]
+          description: |
+            A large export is `uploading` until the client says it's uploaded, then `previewing`
+            while the worker reads it. An upload not finished, or a preview not started, within 24
+            hours is cancelled and its file deleted. An import or preview that makes no progress
+            for 3 hours fails; `error` says why.
+        preview: { $ref: "#/components/schemas/ImportPreview", description: Once previewed. }
+        choices: { $ref: "#/components/schemas/ImportChoices" }
+        stats: { $ref: "#/components/schemas/ImportStats" }
+        error: { type: string }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time }
+    ImportStats:
+      type: object
+      description: Progress while importing, then the outcome.
+      required: [total, processed, imported, skipped, merged, dropped_sets]
+      properties:
+        total: { type: integer, description: Workouts with sets in the file. }
+        processed: { type: integer }
+        imported: { type: integer }
+        skipped: { type: integer, description: Imported from this app before, so left alone. }
+        merged:
+          type: integer
+          description: |
+            The same session as another app's import (same activity, overlapping by 80% or more),
+            merged with it: the fuller record shows, with both sources (FR-8.4).
+        dropped_sets: { type: integer, description: Sets outside logging's limits, not stored. }
+    ImportPreview:
+      type: object
+      description: What the import would bring in (FR-8.1).
+      required: [workouts, sets, first_day, last_day, already_imported, already_deleted, merges, logged_overlaps, ask_load_unit, ask_distance_unit, exercises, warnings]
+      properties:
+        workouts: { type: integer }
+        sets: { type: integer }
+        first_day: { $ref: "#/components/schemas/Date" }
+        last_day: { $ref: "#/components/schemas/Date" }
+        already_imported: { type: integer, description: Workouts imported from this app before; they're skipped. }
+        already_deleted: { type: integer, description: Of those, ones the user deleted; they stay deleted. }
+        merges:
+          type: integer
+          description: Activities another app already imported; they're merged with that record, keeping the fuller one.
+        logged_overlaps:
+          type: array
+          description: |
+            Activities that look like sessions logged in Lifterclub (the same activity the same
+            day). Both are kept; the user may delete one. Up to 50.
+          items:
+            type: object
+            required: [started_at, workout_id]
+            properties:
+              started_at: { type: string, format: date-time, description: The activity's start. }
+              workout_id: { type: string, format: uuid, description: The logged workout. }
+        ask_load_unit: { type: boolean, description: "The file doesn't name its weight unit: choose load_unit." }
+        ask_distance_unit: { type: boolean, description: "The file doesn't name its distance unit: choose distance_unit." }
+        exercises:
+          type: array
+          description: Each exercise name in the file, ones needing a choice first.
+          items: { $ref: "#/components/schemas/PreviewExercise" }
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/ImportWarning" }
+    PreviewExercise:
+      type: object
+      required: [name, workouts, sets, match]
+      properties:
+        name: { type: string, description: As the other app named it. }
+        workouts: { type: integer }
+        sets: { type: integer }
+        match: { $ref: "#/components/schemas/Match" }
+    ImportWarning:
+      type: object
+      required: [line, message]
+      properties:
+        file: { type: string, description: The file within a zip the warning is about. }
+        line: { type: integer, description: Line in the file; 0 for the whole file. }
+        message: { type: string }
+    ImportChoices:
+      type: object
+      required: [load_unit, distance_unit, mappings]
+      properties:
+        load_unit: { enum: [kg, lb] }
+        distance_unit: { enum: [km, mi, m] }
+        mappings:
+          type: object
+          description: Exercise name in the file → exercise ID.
+          additionalProperties: { type: string }
+    ImportUploadRequest:
+      type: object
+      required: [file_name, size]
+      properties:
+        file_name: { type: string, description: "The file's name, shown to the user." }
+        size: { type: integer, minimum: 1, maximum: 17179869184, description: Bytes. }
+    ImportPatch:
+      type: object
+      minProperties: 1
+      properties:
+        load_unit: { enum: [kg, lb] }
+        distance_unit: { enum: [km, mi, m] }
+        mappings:
+          type: object
+          description: Exercise name → exercise ID, or null to remove the mapping.
+          additionalProperties: { type: [string, "null"] }
+    ExerciseRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, maxLength: 80 }
+        measurement_type: { $ref: "#/components/schemas/MeasurementType" }
+
+    SetInput:
+      type: object
+      properties:
+        reps: { type: integer, minimum: 0, maximum: 1000 }
+        load: { type: number, minimum: 0, description: Leave out for bodyweight. }
+        unit: { $ref: "#/components/schemas/Unit", description: Leave out for the user's unit. }
+        rpe: { type: number, minimum: 1, maximum: 10 }
+        duration_s: { type: integer, minimum: 0 }
+        distance_m: { type: number, minimum: 0 }
+        calories: { type: integer, minimum: 0, maximum: 20000, description: Kilocalories, only as a machine, watch or app reported them. }
+        heart_rate_bpm: { type: integer, minimum: 0, maximum: 300, description: Average heart rate over the set, only as a watch or app reported it. }
+        warmup: { type: boolean, description: Warm-ups don't count toward records. }
+        estimated: { type: boolean, description: The values were inferred (e.g. read from a photo), not stated. }
+    ExerciseInput:
+      type: object
+      required: [sets]
+      properties:
+        name: { type: string, description: The exercise as the user named it. }
+        exercise_id: { type: string, description: A catalogue or custom ID, when known; skips matching. }
+        sets:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: { $ref: "#/components/schemas/SetInput" }
+        notes: { type: string }
+    WorkoutInput:
+      type: object
+      required: [exercises]
+      properties:
+        started_at: { type: string, format: date-time }
+        date: { $ref: "#/components/schemas/Date", description: Day in the user's timezone, when started_at is not given. Default today. }
+        title: { type: string }
+        notes: { type: string }
+        exercises:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: "#/components/schemas/ExerciseInput" }
+        program: { $ref: "#/components/schemas/ProgramRef" }
+        external_id: { type: string, maxLength: 200, description: "Your app's own ID for this workout. A second POST with the same ID replays the first (200, `Idempotent-Replayed: true`) instead of logging twice; one the person has since deleted here answers 404 and stays deleted. Not for the web app." }
+    TextRequest:
+      type: object
+      required: [text]
+      properties:
+        text: { type: string, maxLength: 2000, description: The user's own words. }
+        date: { $ref: "#/components/schemas/Date" }
+    WorkoutPatch:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string }
+        date: { $ref: "#/components/schemas/Date", description: Move the workout to this day. }
+        ended_at:
+          type: string
+          format: date-time
+          description: Finish the workout (a live session). Not before it started, nor in the future; POST /v1/workouts/current/sets then starts a new one.
+        notes: { type: string }
+    AddSetsRequest:
+      type: object
+      required: [sets]
+      properties:
+        exercise: { type: string, description: As the user named it. }
+        exercise_id: { type: string }
+        sets:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/SetInput" }
+    EntrySetsRequest:
+      type: object
+      required: [sets]
+      properties:
+        sets:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/SetInput" }
+    EntryPatch:
+      type: object
+      minProperties: 1
+      properties:
+        exercise_id: { type: string, description: From needs_confirmation candidates or /v1/exercises. }
+        notes: { type: string }
+    SetPatch:
+      type: object
+      minProperties: 1
+      properties:
+        reps: { type: integer, minimum: 0 }
+        load: { type: number, minimum: 0 }
+        unit: { $ref: "#/components/schemas/Unit" }
+        remove_load: { type: boolean, description: Make it bodyweight. }
+        rpe: { type: number, minimum: 1, maximum: 10 }
+        duration_s: { type: integer, minimum: 0 }
+        distance_m: { type: number, minimum: 0 }
+        calories: { type: integer, minimum: 0, maximum: 20000 }
+        heart_rate_bpm: { type: integer, minimum: 0, maximum: 300 }
+        warmup: { type: boolean }
+    UndoRequest:
+      type: object
+      required: [undo_token]
+      properties:
+        undo_token: { type: string }
+    ProfilePatch:
+      type: object
+      minProperties: 1
+      properties:
+        display_name: { type: string }
+        units: { $ref: "#/components/schemas/Unit" }
+        timezone: { type: string, description: IANA name, e.g. America/New_York. }
+        program_counts: { type: boolean }
+        program_suggestions: { type: boolean }
+        calm_mode: { type: boolean, description: Hide records, totals and progress numbers. }
+        goals: { type: string }
+        equipment: { type: array, items: { type: string } }
+        limitations: { type: string }
+        training_days: { type: array, items: { type: string } }
