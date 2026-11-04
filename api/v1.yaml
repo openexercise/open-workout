@@ -12,7 +12,7 @@ info:
     scope) are RFC 6750 bearer errors with a `WWW-Authenticate` header instead.
 
     Reads and writes are each limited per account, shared with MCP: 600 reads and 60 writes a
-    minute. Each app also has a budget across all its users: 6,000 reads and 600 writes a minute,
+    minute. Each app also has a budget across all its users: 1,200 reads and 120 writes a minute,
     ten times that for a verified partner. Over either, requests get 429 with `Retry-After`.
 
     Requests that create things take an `Idempotency-Key` header: a retry with the same key
