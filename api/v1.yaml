@@ -951,6 +951,31 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/routines/{id}/targets:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getRoutineTargets
+      summary: Suggested next weights for a routine
+      description: >-
+        One suggestion per row, in order, worked out when read from the row's progression rule (or
+        the default for its shape: a rep range moves by double progression, fixed reps by a fixed
+        increment, and either drops 10% after three sessions short at one weight) and the person's
+        sessions of that lift from any workout in the last year. The row's own weight is where a
+        lift with no history starts. Suggestions only: nothing is logged or stored.
+      tags: [Routines]
+      security: [{ oauth2: [workouts:read] }]
+      responses:
+        "200":
+          description: The suggestions.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoutineTargets" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/phrases:
     get:
       operationId: listPhrases
@@ -1813,6 +1838,42 @@ components:
         distance_m: { type: number, minimum: 0 }
         rest_seconds: { type: integer, minimum: 0 }
         notes: { type: string }
+        progression: { $ref: "#/components/schemas/RoutineRule" }
+    RoutineRule:
+      type: object
+      description: >-
+        How a routine row's next weight is suggested; leave it out for the default for the row's
+        shape. linear adds the increment when every set reaches reps_min; double works up the rep
+        range, then adds it. Both need sets and reps_min, double a range. off makes no suggestion.
+      required: [type]
+      additionalProperties: false
+      properties:
+        type: { enum: [linear, double, "off"] }
+        increment:
+          type: object
+          required: [value, unit]
+          additionalProperties: false
+          properties:
+            value: { type: number, exclusiveMinimum: 0, maximum: 50 }
+            unit: { $ref: "#/components/schemas/Unit" }
+    RoutineTargets:
+      type: object
+      required: [label, targets]
+      properties:
+        label: { type: string }
+        targets:
+          type: array
+          items:
+            type: object
+            required: [exercise_id, exercise_name, explanation, needs_start, is_default]
+            properties:
+              exercise_id: { type: string }
+              exercise_name: { type: string }
+              load: { $ref: "#/components/schemas/ProgramNumber" }
+              explanation: { type: string }
+              needs_start: { type: boolean, description: Always false for a routine. }
+              rule: { $ref: "#/components/schemas/RoutineRule" }
+              is_default: { type: boolean, description: The rule is the default for the row's shape. }
     LogExport:
       type: object
       required: [exported_at, routines, program_enrollments, program_suggestions_dismissed, workouts]
@@ -1859,6 +1920,10 @@ components:
                     load: { $ref: "#/components/schemas/ProgramNumber" }
                     explanation: { type: string }
                     needs_start: { type: boolean }
+                    sets:
+                      description: The set scheme to do this time, when the slot's stages rule chooses one.
+                      type: array
+                      items: { $ref: "../schema/v0/program.json#/$defs/setGroup" }
     UndoSuggestionInput:
       type: object
       required: [workout_ids]
@@ -2089,6 +2154,7 @@ components:
               distance_m: { type: number }
               rest_seconds: { type: integer }
               notes: { type: string }
+              progression: { $ref: "#/components/schemas/RoutineRule" }
     Match:
       type: object
       required: [phrase, status, exercise, confidence, method, candidates]

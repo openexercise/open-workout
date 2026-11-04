@@ -1,6 +1,6 @@
 {
   "$schema": "https://openworkout.dev/schema/v0/program.json",
-  "progression": "Add 2.5 kg to a lift whenever every set reaches its reps.",
+  "progression": "Add 2.5 kg to a lift whenever every set reaches its reps; after three sessions short at one weight, take 10% off and build back up.",
   "weeks": [
     {
       "days": [
@@ -8,16 +8,16 @@
           "key": "a",
           "name": "Day A",
           "slots": [
-            { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } },
-            { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } }
+            { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "on_fail": { "after_misses": 3, "drop_percent": 10 } } },
+            { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "on_fail": { "after_misses": 3, "drop_percent": 10 } } }
           ]
         },
         {
           "key": "b",
           "name": "Day B",
           "slots": [
-            { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } },
-            { "exercise": { "id": "oec:barbell-overhead-press" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "choice" } }
+            { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "on_fail": { "after_misses": 3, "drop_percent": 10 } } },
+            { "exercise": { "id": "oec:barbell-overhead-press" }, "sets": [{ "count": 5, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "on_fail": { "after_misses": 3, "drop_percent": 10 } } }
           ]
         }
       ]

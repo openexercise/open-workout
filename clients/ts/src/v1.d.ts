@@ -661,6 +661,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/routines/{id}/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Suggested next weights for a routine
+         * @description One suggestion per row, in order, worked out when read from the row's progression rule (or the default for its shape: a rep range moves by double progression, fixed reps by a fixed increment, and either drops 10% after three sessions short at one weight) and the person's sessions of that lift from any workout in the last year. The row's own weight is where a lift with no history starts. Suggestions only: nothing is logged or stored.
+         */
+        get: operations["getRoutineTargets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/phrases": {
         parameters: {
             query?: never;
@@ -1212,6 +1234,30 @@ export interface components {
             distance_m?: number;
             rest_seconds?: number;
             notes?: string;
+            progression?: components["schemas"]["RoutineRule"];
+        };
+        /** @description How a routine row's next weight is suggested; leave it out for the default for the row's shape. linear adds the increment when every set reaches reps_min; double works up the rep range, then adds it. Both need sets and reps_min, double a range. off makes no suggestion. */
+        RoutineRule: {
+            /** @enum {unknown} */
+            type: "linear" | "double" | "off";
+            increment?: {
+                value: number;
+                unit: components["schemas"]["Unit"];
+            };
+        };
+        RoutineTargets: {
+            label: string;
+            targets: {
+                exercise_id: string;
+                exercise_name: string;
+                load?: components["schemas"]["ProgramNumber"];
+                explanation: string;
+                /** @description Always false for a routine. */
+                needs_start: boolean;
+                rule?: components["schemas"]["RoutineRule"];
+                /** @description The rule is the default for the row's shape. */
+                is_default: boolean;
+            }[];
         };
         LogExport: {
             /** Format: date-time */
@@ -1238,6 +1284,8 @@ export interface components {
                     load?: components["schemas"]["ProgramNumber"];
                     explanation: string;
                     needs_start: boolean;
+                    /** @description The set scheme to do this time, when the slot's stages rule chooses one. */
+                    sets?: components["schemas"]["setGroup"][];
                 }[];
             }[];
         };
@@ -1450,6 +1498,7 @@ export interface components {
                 distance_m?: number;
                 rest_seconds?: number;
                 notes?: string;
+                progression?: components["schemas"]["RoutineRule"];
             }[];
         };
         Match: {
@@ -1874,22 +1923,66 @@ export interface components {
             /** @description As many reps as possible, reps_min at least. */
             amrap?: boolean;
         };
-        /** @description How to pick the load. Value and unit depend on the type: percent_training_max and rpe take a value, last_plus a value and unit, choice neither. */
+        /** @description Where the load comes from. percent_training_max and rpe take a value; last and choice take none. */
         loadPrescription: {
-            /** @enum {unknown} */
-            type: "percent_training_max" | "rpe" | "last_plus" | "choice";
+            /**
+             * @description last: the load used last time on this slot, moved by the slot's progression rule. choice: the person's own pick.
+             * @enum {unknown}
+             */
+            type: "percent_training_max" | "rpe" | "last" | "choice";
             value?: number;
+        };
+        weight: {
+            value: number;
             /** @enum {unknown} */
-            unit?: "kg" | "lb";
-            /** @description A failure rule on last_plus: after this many sessions short at one weight. */
-            after_misses?: number;
-            /** @description Take this much off when the failure rule applies. */
-            drop_percent?: number;
+            unit: "kg" | "lb";
+        };
+        /** @description After this many sessions in a row short of the slot's sets at one load, take drop_percent off and build back up. A session with reps unknown is neither short nor done. */
+        failureRule: {
+            after_misses: number;
+            drop_percent: number;
+        };
+        /** @description How the next session's load follows from the last one, on a slot whose load is last. A target is worked out when read and never changes the program or a past workout. Short means a set below its reps_min, or fewer sets than the slot asks for: the load stays, and on_fail decides when it drops. linear: done (success) adds increment. double: every set at its reps_max adds increment; otherwise add reps at the same load. increment_table: the slot's AMRAP set picks the highest band whose reps_min it reached and adds that band's increment; below every band, the load stays. stages: the slot's sets are the first stage and stages lists the ones after it; every set done adds increment at the same stage, a short session moves to the next stage at the same load, and a short session on the last stage starts again at the first stage from restart. The current stage follows from replaying the program's sessions in order, each read against the stage it was suggested at. Sessions of an exercise count for a slot only when logged on a day whose slot for that exercise has the same load and rule. variations, on a slot whose load is choice: moves the exercise, not the weight. ladder lists exercises easiest first, the slot's own among them; the step to do is the one logged last time (any step counts as the slot), or the next one when every planned set of it reached reps (rep sets) or hold_s seconds (timed sets). Unknown reps or times never count as reached. Every step of a ladder is measured the way the slot's sets are. linear and increment_table on a slot whose load is percent_training_max move the lift's training max instead of a load: start from the person's training max, then, oldest first, every session logged on a training-max slot of that lift with a rule adds what the rule adds when met, and counts a miss when short (on_fail takes its drop off the training max). Sessions on slots without a rule, or on no known day, leave it alone. Every percentage slot of the lift works from the result. */
+        progressionRule: {
+            /** @enum {unknown} */
+            type: "linear" | "double" | "increment_table" | "stages" | "variations";
+            /** @description variations only: Open Exercise IDs, easiest first, each once, including the slot's own exercise. */
+            ladder?: components["schemas"]["exerciseRef"][];
+            /** @description variations on timed sets: the hold every set must reach to move on. */
+            hold_s?: number;
+            /** @description linear, double and stages: what a successful session adds. */
+            increment?: components["schemas"]["weight"];
+            /** @description stages only: the set schemes after the slot's own sets, in order. Sets with reps. */
+            stages?: components["schemas"]["setGroup"][][];
+            /** @description stages only, and required there: the load to start the first stage again from, after a short session on the last stage. The base load, less drop_percent, plus add, rounded down. Give drop_percent, add or both. */
+            restart?: {
+                /**
+                 * @description last: the load of the short session. first_stage_success: the last load every set of the first stage was done at (last when there is none).
+                 * @enum {unknown}
+                 */
+                from: "last" | "first_stage_success";
+                drop_percent?: number;
+                add?: components["schemas"]["weight"];
+            };
+            /**
+             * @description linear: all_sets (the default): every set reached its reps_min. total_reps: the sets' reps add up to at least reps. amrap: the slot's AMRAP set reached at least reps. stages: all_sets (the default), or total_reps, where every set of the stage is there and their reps add up to at least the stage's reps_min, so a set that went further makes up for a short one.
+             * @enum {unknown}
+             */
+            success?: "all_sets" | "total_reps" | "amrap";
+            /** @description The threshold for success total_reps or amrap, or, on variations, the reps every set must reach to move on. */
+            reps?: number;
+            /** @description increment_table only, in rising reps_min. */
+            bands?: {
+                reps_min: number;
+                increment: components["schemas"]["weight"];
+            }[];
+            on_fail?: components["schemas"]["failureRule"];
         };
         slot: {
             exercise: components["schemas"]["exerciseRef"];
             sets: components["schemas"]["setGroup"][];
             load: components["schemas"]["loadPrescription"];
+            progression?: components["schemas"]["progressionRule"];
             rest_seconds?: number;
             substitutes?: components["schemas"]["exerciseRef"][];
             notes?: string;
@@ -3158,6 +3251,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getRoutineTargets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutineTargets"];
+                };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
