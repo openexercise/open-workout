@@ -1,0 +1,35 @@
+# Publishes clients/ts to npm as @openexercise/lifterclub-client when a tag clients-ts-v<version>
+# is pushed, with npm's trusted publishing: no token is stored here. npm checks that this
+# repository and this workflow file are the package's trusted publisher (package settings on
+# npmjs.com), and attaches provenance. The tag must match the version in package.json.
+name: Publish TypeScript client
+on:
+  push:
+    tags: ['clients-ts-v*']
+permissions:
+  contents: read
+  id-token: write # trusted publishing and provenance
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/ts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@11.6.2
+      - run: npm ci
+      - name: The tag matches the package version
+        run: |
+          want="${GITHUB_REF_NAME#clients-ts-v}"
+          have=$(node -p "require('./package.json').version")
+          test "$want" = "$have" || { echo "tag says $want, package.json says $have"; exit 1; }
+      - run: npm run check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm publish --provenance --access public

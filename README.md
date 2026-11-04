@@ -64,7 +64,19 @@ Both are thin: the access token on every request, an `Idempotency-Key` on every 
 go get github.com/openexercise/open-workout/clients/go
 ```
 
-The TypeScript package isn't on npm yet; build it from `clients/ts` (`npm ci && npm run build`). `npm run check` fails when its generated types no longer match `api/v1.yaml`.
+```bash
+npm install @openexercise/lifterclub-client
+```
+
+`npm run check` in `clients/ts` fails when its generated types no longer match `api/v1.yaml`.
+
+### Releasing the TypeScript client
+
+The package and its version come from Lifterclub, which publishes them here. To release one:
+
+1. Bump `version` in `clients/ts/package.json` there, run its publish script into this repository, and merge.
+2. Tag the merge here and push the tag: `git tag clients-ts-v0.2.0 && git push origin clients-ts-v0.2.0`.
+3. The Publish TypeScript client workflow checks the tag against `package.json`, tests, and publishes with provenance, through npm's trusted publishing: no token is stored in this repository.
 
 ## Relationship to other standards
 

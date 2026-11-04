@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { ApiError, changes, createLifterclubClient, retryAfter, unwrap, verifySignature, workouts } from './index'
+import { ApiError, changes, createLifterclubClient, retryAfter, unwrap, verifySignature, workouts } from './index.js'
 
 type Handler = (request: Request) => Response | Promise<Response>
 
