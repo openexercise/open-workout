@@ -127,11 +127,13 @@ func buildSite(root, out string) error {
 		}
 	}
 
-	// The schema files at their $id paths, the profile, the examples, and the stylesheet.
+	// The schema files at their $id paths, the progression rules' worked cases, the profile, the
+	// examples, and the stylesheet.
 	copies := map[string]string{
-		"schema/v0/workout.json": filepath.Join(root, "schema", "v0", "workout.json"),
-		"schema/v0/program.json": filepath.Join(root, "schema", "v0", "program.json"),
-		"mcp/tools.json":         filepath.Join(root, "mcp", "tools.json"),
+		"schema/v0/workout.json":             filepath.Join(root, "schema", "v0", "workout.json"),
+		"schema/v0/program.json":             filepath.Join(root, "schema", "v0", "program.json"),
+		"schema/v0/progression-vectors.json": filepath.Join(root, "schema", "v0", "progression-vectors.json"),
+		"mcp/tools.json":                     filepath.Join(root, "mcp", "tools.json"),
 	}
 	examples, _ := filepath.Glob(filepath.Join(root, "examples", "*.json"))
 	for _, e := range examples {
@@ -179,6 +181,9 @@ func loadSchemas(dir string) ([]schemaDoc, error) {
 		var s map[string]any
 		if err := json.Unmarshal(data, &s); err != nil {
 			return nil, fmt.Errorf("decode %s: %w", p, err)
+		}
+		if str(s["$id"]) == "" {
+			continue // Not a schema: the progression rules' worked cases sit beside them.
 		}
 		doc := schemaDoc{
 			Kind: strings.TrimSuffix(filepath.Base(p), ".json"), ID: str(s["$id"]), Title: str(s["title"]), Description: str(s["description"]),
