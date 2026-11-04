@@ -1,4 +1,4 @@
-# lifterclub-client
+# @openexercise/lifterclub-client
 
 A thin TypeScript client for the [Lifterclub API](https://lifterclub.com/developers): the
 types generated from the API's OpenAPI document (`src/v1.d.ts`), an
@@ -6,12 +6,16 @@ types generated from the API's OpenAPI document (`src/v1.d.ts`), an
 `Idempotency-Key` on every POST, and a few helpers. Workouts are
 [Open Workout Schema](https://openworkout.dev) documents.
 
-Not on npm yet. Build it with `npm run build` and point at `dist`, or copy `src`.
+```bash
+npm install @openexercise/lifterclub-client
+```
+
+Published from [openexercise/open-workout](https://github.com/openexercise/open-workout/tree/main/clients/ts), where a tag `clients-ts-v<version>` releases it with npm provenance.
 
 ## Use
 
 ```ts
-import { changes, createLifterclubClient, unwrap, verifySignature } from 'lifterclub-client'
+import { changes, createLifterclubClient, unwrap, verifySignature } from '@openexercise/lifterclub-client'
 
 const api = createLifterclubClient({ token: () => tokens.access })
 

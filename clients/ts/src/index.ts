@@ -3,7 +3,7 @@
 // webhook signatures. Everything else is the API as documented.
 import createClient, { type Client, type Middleware } from 'openapi-fetch'
 
-import type { components, paths } from './v1'
+import type { components, paths } from './v1.js'
 
 export type { components, paths }
 
