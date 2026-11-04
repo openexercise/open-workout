@@ -1284,8 +1284,17 @@ export interface components {
                     load?: components["schemas"]["ProgramNumber"];
                     explanation: string;
                     needs_start: boolean;
+                    /** @description The key in starting_numbers this slot reads, when it reads one: the exercise ID, or, for a lift the program reads more than one way (a heavy and a light tier, say), the exercise ID, @ and the first day that reads it this way, such as oec:barbell-back-squat@a2. Send the number under this key. */
+                    start_key?: string;
                     /** @description The set scheme to do this time, when the slot's stages rule chooses one. */
                     sets?: components["schemas"]["setGroup"][];
+                    /** @description Each set group's weight, in the slot's order, when its set groups carry their own percentages of the training max. load is then the heaviest. */
+                    loads?: components["schemas"]["ProgramNumber"][];
+                    /** @description The lift whose training max this slot works from, when it isn't the slot's own exercise (a front squat from the back squat's), as done: a swap of that lift moves it to the swap's. Its start_key is that lift's. */
+                    of?: {
+                        id: string;
+                        name: string;
+                    };
                 }[];
             }[];
         };
@@ -1327,10 +1336,11 @@ export interface components {
             end?: boolean;
             version?: number;
             swaps?: components["schemas"]["ProgramSwap"][];
+            /** @description Keyed by each target's start_key. */
             starting_numbers?: {
                 [key: string]: components["schemas"]["ProgramNumber"];
             };
-            /** @description Fill in the rest from the last time each exercise was logged. */
+            /** @description Fill in the rest from the last time each exercise was logged. A lift the program reads more than one way is left for the person to enter. */
             start_from_history?: boolean;
         };
         ProgramEnrollment: {
@@ -1922,27 +1932,38 @@ export interface components {
             duration_s?: number;
             /** @description As many reps as possible, reps_min at least. */
             amrap?: boolean;
+            /** @description On a slot whose load is percent_training_max with no value: this group's own percentage of the training max, so a lift done as a ramp of sets at different weights is one slot. Then every group of the slot has one. Never on a stage. */
+            percent?: number;
         };
-        /** @description Where the load comes from. percent_training_max and rpe take a value; last and choice take none. */
+        /** @description Where the load comes from. rpe takes a value; last and choice take none. percent_training_max takes a value, or none when every set group has its own percent, and may name the lift whose training max it works from in of. percent_of_slot takes a value and a day, and may name an exercise in of. */
         loadPrescription: {
             /**
-             * @description last: the load used last time on this slot, moved by the slot's progression rule. choice: the person's own pick.
+             * @description last: the load used last time on this slot, moved by the slot's progression rule. choice: the person's own pick. percent_of_slot: value percent of the current target of another slot, rounded down: the first slot on day whose exercise is of, or this slot's own exercise (Texas Method's volume day at 90% of the intensity day). It follows that slot, so it carries no progression rule; chains are allowed, cycles aren't. While the slot it reads has no weight yet, it waits on that slot's starting number.
              * @enum {unknown}
              */
-            type: "percent_training_max" | "rpe" | "last" | "choice";
+            type: "percent_training_max" | "rpe" | "last" | "choice" | "percent_of_slot";
             value?: number;
+            /** @description percent_of_slot only: the key of the day whose slot it reads. */
+            day?: string;
+            /** @description percent_training_max: the lift whose training max this slot works from, when it isn't the slot's own exercise (a front squat at a percentage of the back squat's training max). It reads that lift's training max as moved by that lift's own slots; a slot with of carries no progression rule. percent_of_slot: the exercise of the slot it reads, when it isn't this slot's own. */
+            of?: components["schemas"]["exerciseRef"];
         };
         weight: {
             value: number;
-            /** @enum {unknown} */
-            unit: "kg" | "lb";
+            /**
+             * @description % only on a linear rule's increment: that percentage of the load or training max it adds to, rounded to a step a bar can make, and at least one step (Madcow's 2.5% a week).
+             * @enum {unknown}
+             */
+            unit: "kg" | "lb" | "%";
         };
         /** @description After this many sessions in a row short of the slot's sets at one load, take drop_percent off and build back up. A session with reps unknown is neither short nor done. */
         failureRule: {
             after_misses: number;
             drop_percent: number;
+            /** @description linear with stages only, and required there: the drop that makes this many at one set scheme also moves on to the next scheme (StrongLifts: 5x5, then 3x5, then 3x3). */
+            stage_after_drops?: number;
         };
-        /** @description How the next session's load follows from the last one, on a slot whose load is last. A target is worked out when read and never changes the program or a past workout. Short means a set below its reps_min, or fewer sets than the slot asks for: the load stays, and on_fail decides when it drops. linear: done (success) adds increment. double: every set at its reps_max adds increment; otherwise add reps at the same load. increment_table: the slot's AMRAP set picks the highest band whose reps_min it reached and adds that band's increment; below every band, the load stays. stages: the slot's sets are the first stage and stages lists the ones after it; every set done adds increment at the same stage, a short session moves to the next stage at the same load, and a short session on the last stage starts again at the first stage from restart. The current stage follows from replaying the program's sessions in order, each read against the stage it was suggested at. Sessions of an exercise count for a slot only when logged on a day whose slot for that exercise has the same load and rule. variations, on a slot whose load is choice: moves the exercise, not the weight. ladder lists exercises easiest first, the slot's own among them; the step to do is the one logged last time (any step counts as the slot), or the next one when every planned set of it reached reps (rep sets) or hold_s seconds (timed sets). Unknown reps or times never count as reached. Every step of a ladder is measured the way the slot's sets are. linear and increment_table on a slot whose load is percent_training_max move the lift's training max instead of a load: start from the person's training max, then, oldest first, every session logged on a training-max slot of that lift with a rule adds what the rule adds when met, and counts a miss when short (on_fail takes its drop off the training max). Sessions on slots without a rule, or on no known day, leave it alone. Every percentage slot of the lift works from the result. */
+        /** @description How the next session's load follows from the last one, on a slot whose load is last. A target is worked out when read and never changes the program or a past workout. Short means a set below its reps_min, or fewer sets than the slot asks for: the load stays, and on_fail decides when it drops. Missing data holds: a session with reps unknown on a set the rule reads, none missing and none logged short, is neither done nor short, so the load, stage and training max stay and a run of misses neither grows nor ends. linear: done (success) adds increment. A linear rule may carry stages: its on_fail drops as usual, and the drop that makes stage_after_drops drops at one set scheme also moves on to the next scheme (the last one stays), replayed in order like stages, each session read against the scheme it was suggested at; success is then all_sets. Where a rule reads an AMRAP set (increment_table, or linear with success amrap), it reads amrap_set when given, else the slot's last AMRAP set. double: every set at its reps_max adds increment; otherwise add reps at the same load. increment_table: the slot's AMRAP set picks the highest band whose reps_min it reached and adds that band's increment; below every band, the load stays. stages: the slot's sets are the first stage and stages lists the ones after it; every set done adds increment at the same stage, a short session moves to the next stage at the same load, and a short session on the last stage starts again at the first stage from restart. The current stage follows from replaying the program's sessions in order, each read against the stage it was suggested at. Sessions of an exercise count for a slot only when logged on a day whose slot for that exercise has the same load and rule. variations, on a slot whose load is choice: moves the exercise, not the weight. ladder lists exercises easiest first, the slot's own among them; the step to do is the one logged last time (any step counts as the slot), or the next one when every planned set of it reached reps (rep sets) or hold_s seconds (timed sets). Unknown reps or times never count as reached. Every step of a ladder is measured the way the slot's sets are. linear and increment_table on a slot whose load is percent_training_max move the lift's training max instead of a load: start from the person's training max, then, oldest first, every session logged on a training-max slot of that lift with a rule adds what the rule adds when met, and counts a miss when short (on_fail takes its drop off the training max). Sessions on slots without a rule, or on no known day, leave it alone. Every percentage slot of the lift works from the result. */
         progressionRule: {
             /** @enum {unknown} */
             type: "linear" | "double" | "increment_table" | "stages" | "variations";
@@ -1952,7 +1973,7 @@ export interface components {
             hold_s?: number;
             /** @description linear, double and stages: what a successful session adds. */
             increment?: components["schemas"]["weight"];
-            /** @description stages only: the set schemes after the slot's own sets, in order. Sets with reps. */
+            /** @description stages, or linear with on_fail.stage_after_drops: the set schemes after the slot's own sets, in order. Sets with reps. */
             stages?: components["schemas"]["setGroup"][][];
             /** @description stages only, and required there: the load to start the first stage again from, after a short session on the last stage. The base load, less drop_percent, plus add, rounded down. Give drop_percent, add or both. */
             restart?: {
@@ -1977,6 +1998,8 @@ export interface components {
                 increment: components["schemas"]["weight"];
             }[];
             on_fail?: components["schemas"]["failureRule"];
+            /** @description increment_table, or linear with success amrap: which of the slot's planned sets, counting from 1, the rule reads, when it isn't the last AMRAP set. It must be an AMRAP set. */
+            amrap_set?: number;
         };
         slot: {
             exercise: components["schemas"]["exerciseRef"];

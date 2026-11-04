@@ -1,6 +1,6 @@
 {
   "name": "@openexercise/lifterclub-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A thin TypeScript client for the Lifterclub API, generated from its OpenAPI document.",
   "license": "Apache-2.0",
   "repository": {
