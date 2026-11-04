@@ -82,6 +82,10 @@ The package and its version come from Lifterclub, which publishes them here. To 
 
 An OWS entry refers to its exercise by an [Open Exercise](https://github.com/openexercise/open-exercise) ID (`oec:barbell-bench-press`). Open Exercise says what an exercise is; Open Workout records what someone did.
 
+## Taking part
+
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md) for who decides and how, the [code of conduct](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately.
+
 ## Licence
 
 [Apache-2.0](LICENSE).
