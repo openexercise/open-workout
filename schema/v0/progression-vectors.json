@@ -1,0 +1,343 @@
+{
+  "description": "Test vectors for program.json progression rules. Each case is one slot, the sessions logged for it oldest first, and the target an implementation should work out next. A session gives its top working load and each working set's reps in order (or holds, in seconds, for timed sets), and the exercise it was logged as when that isn't the slot's own; null reps or holds are unknown. want.exercise is the exercise to do next, for a variations rule. Exercise IDs illustrate the rules and aren't checked against the catalogue. Loads are in the case's unit. A reduced load is rounded down to step for that unit, and an increment in another unit is converted and rounded to it. Explanations are each app's own words and aren't part of the vectors.",
+  "step": { "kg": 1.25, "lb": 2.5 },
+  "cases": [
+    {
+      "name": "linear: every set done adds the increment",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 100, "reps": [5, 5, 5] }],
+      "want": { "load": 105 }
+    },
+    {
+      "name": "linear: a short session holds the load",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 100, "reps": [5, 4, 3] }],
+      "want": { "load": 100 }
+    },
+    {
+      "name": "linear: too few sets is short",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 100, "reps": [5, 5] }],
+      "want": { "load": 100 }
+    },
+    {
+      "name": "linear: unknown reps count as done for all_sets",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 100, "reps": [null, null, null] }],
+      "want": { "load": 105 }
+    },
+    {
+      "name": "linear: on_fail drops after the misses in a row, rounded down",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" }, "on_fail": { "after_misses": 3, "drop_percent": 10 } } },
+      "sessions": [{ "load": 135, "reps": [5, 5, 4] }, { "load": 135, "reps": [5, 4, 4] }, { "load": 135, "reps": [5, 5, 3] }],
+      "want": { "load": 120 }
+    },
+    {
+      "name": "linear: misses at another load don't add up",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" }, "on_fail": { "after_misses": 3, "drop_percent": 10 } } },
+      "sessions": [{ "load": 130, "reps": [5, 5, 4] }, { "load": 135, "reps": [5, 4, 4] }, { "load": 135, "reps": [5, 5, 3] }],
+      "want": { "load": 135 }
+    },
+    {
+      "name": "linear: a kg increment in lb",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" } } },
+      "sessions": [{ "load": 100, "reps": [5, 5, 5] }],
+      "want": { "load": 105 }
+    },
+    {
+      "name": "linear total_reps: reached",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 3 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "success": "total_reps", "reps": 25 } },
+      "sessions": [{ "load": 60, "reps": [9, 8, 8] }],
+      "want": { "load": 62.5 }
+    },
+    {
+      "name": "linear total_reps: short of the threshold holds",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 3 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "success": "total_reps", "reps": 25 } },
+      "sessions": [{ "load": 60, "reps": [8, 8, 8] }],
+      "want": { "load": 60 }
+    },
+    {
+      "name": "linear total_reps: unknown reps hold",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 3 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" }, "success": "total_reps", "reps": 25 } },
+      "sessions": [{ "load": 60, "reps": [12, 12, null] }],
+      "want": { "load": 60 }
+    },
+    {
+      "name": "linear amrap: the last set reached the threshold",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:machine-lat-pulldown" }, "sets": [{ "count": 2, "reps_min": 15 }, { "count": 1, "reps_min": 15, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" }, "success": "amrap", "reps": 25 } },
+      "sessions": [{ "load": 80, "reps": [15, 15, 26] }],
+      "want": { "load": 85 }
+    },
+    {
+      "name": "linear amrap: below the threshold holds",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:machine-lat-pulldown" }, "sets": [{ "count": 2, "reps_min": 15 }, { "count": 1, "reps_min": 15, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 5, "unit": "lb" }, "success": "amrap", "reps": 25 } },
+      "sessions": [{ "load": 80, "reps": [15, 15, 20] }],
+      "want": { "load": 80 }
+    },
+    {
+      "name": "double: every set at the top of the range adds",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:dumbbell-bench-press" }, "sets": [{ "count": 3, "reps_min": 8, "reps_max": 12 }], "load": { "type": "last" }, "progression": { "type": "double", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 50, "reps": [12, 12, 12] }],
+      "want": { "load": 55 }
+    },
+    {
+      "name": "double: inside the range holds",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:dumbbell-bench-press" }, "sets": [{ "count": 3, "reps_min": 8, "reps_max": 12 }], "load": { "type": "last" }, "progression": { "type": "double", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 50, "reps": [12, 11, 9] }],
+      "want": { "load": 50 }
+    },
+    {
+      "name": "double: unknown reps aren't the top of the range",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:dumbbell-bench-press" }, "sets": [{ "count": 3, "reps_min": 8, "reps_max": 12 }], "load": { "type": "last" }, "progression": { "type": "double", "increment": { "value": 5, "unit": "lb" } } },
+      "sessions": [{ "load": 50, "reps": [12, 12, null] }],
+      "want": { "load": 50 }
+    },
+    {
+      "name": "double: on_fail after shorts below the range",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:dumbbell-bench-press" }, "sets": [{ "count": 3, "reps_min": 8, "reps_max": 12 }], "load": { "type": "last" }, "progression": { "type": "double", "increment": { "value": 5, "unit": "lb" }, "on_fail": { "after_misses": 2, "drop_percent": 10 } } },
+      "sessions": [{ "load": 50, "reps": [8, 7, 6] }, { "load": 50, "reps": [8, 7, 7] }],
+      "want": { "load": 45 }
+    },
+    {
+      "name": "increment_table: the highest band reached",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 5, "increment": { "value": 2.5, "unit": "lb" } }, { "reps_min": 10, "increment": { "value": 5, "unit": "lb" } }] } },
+      "sessions": [{ "load": 135, "reps": [5, 5, 11] }],
+      "want": { "load": 140 }
+    },
+    {
+      "name": "increment_table: a lower band",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 5, "increment": { "value": 2.5, "unit": "lb" } }, { "reps_min": 10, "increment": { "value": 5, "unit": "lb" } }] } },
+      "sessions": [{ "load": 135, "reps": [5, 5, 7] }],
+      "want": { "load": 137.5 }
+    },
+    {
+      "name": "increment_table: below every band holds",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 2, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 5, "increment": { "value": 2.5, "unit": "lb" } }] } },
+      "sessions": [{ "load": 135, "reps": [3, 3, 4] }],
+      "want": { "load": 135 }
+    },
+    {
+      "name": "increment_table: an unlogged AMRAP set holds",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 5, "increment": { "value": 2.5, "unit": "lb" } }] } },
+      "sessions": [{ "load": 135, "reps": [5, 5, null] }],
+      "want": { "load": 135 }
+    },
+    {
+      "name": "stages: every set done adds at the first stage",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }], [{ "count": 9, "reps_min": 1 }, { "count": 1, "reps_min": 1, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 200, "reps": [3, 3, 3, 3, 5] }],
+      "want": { "load": 205, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }] }
+    },
+    {
+      "name": "stages: a short session moves to the next stage at the same load",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }], [{ "count": 9, "reps_min": 1 }, { "count": 1, "reps_min": 1, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 200, "reps": [3, 3, 3, 3, 5] }, { "load": 205, "reps": [3, 3, 2, 2, 2] }],
+      "want": { "load": 205, "sets": [{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }] }
+    },
+    {
+      "name": "stages: every set done at a later stage adds and stays there",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }], [{ "count": 9, "reps_min": 1 }, { "count": 1, "reps_min": 1, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 200, "reps": [3, 3, 3, 3, 5] }, { "load": 205, "reps": [3, 3, 2, 2, 2] }, { "load": 205, "reps": [2, 2, 2, 2, 2, 4] }],
+      "want": { "load": 210, "sets": [{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }] }
+    },
+    {
+      "name": "stages: the last stage",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }], [{ "count": 9, "reps_min": 1 }, { "count": 1, "reps_min": 1, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 200, "reps": [3, 3, 3, 3, 5] }, { "load": 205, "reps": [3, 3, 2, 2, 2] }, { "load": 205, "reps": [2, 2, 1, 1, 1, 1] }],
+      "want": { "load": 205, "sets": [{ "count": 9, "reps_min": 1 }, { "count": 1, "reps_min": 1, "amrap": true }] }
+    },
+    {
+      "name": "stages: short on the last stage restarts from the last load less drop_percent",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }], [{ "count": 9, "reps_min": 1 }, { "count": 1, "reps_min": 1, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 200, "reps": [3, 3, 3, 3, 5] }, { "load": 205, "reps": [3, 3, 2, 2, 2] }, { "load": 205, "reps": [2, 2, 1, 1, 1, 1] }, { "load": 205, "reps": [1, 1, 1, 1, 1, 1, 1] }],
+      "want": { "load": 172.5, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }] }
+    },
+    {
+      "name": "stages: restart from the last first-stage success plus add",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 3, "reps_min": 10 }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 3, "reps_min": 8 }], [{ "count": 3, "reps_min": 6 }]], "restart": { "from": "first_stage_success", "add": { "value": 15, "unit": "lb" } } } },
+      "sessions": [{ "load": 100, "reps": [10, 10, 10] }, { "load": 105, "reps": [10, 10, 8] }, { "load": 105, "reps": [8, 8, 6] }, { "load": 105, "reps": [6, 6, 5] }],
+      "want": { "load": 115, "sets": [{ "count": 3, "reps_min": 10 }] }
+    },
+    {
+      "name": "stages: after a restart, the first stage goes on",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 3, "reps_min": 10 }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "lb" }, "stages": [[{ "count": 3, "reps_min": 8 }], [{ "count": 3, "reps_min": 6 }]], "restart": { "from": "first_stage_success", "add": { "value": 15, "unit": "lb" } } } },
+      "sessions": [{ "load": 100, "reps": [10, 10, 10] }, { "load": 105, "reps": [10, 10, 8] }, { "load": 105, "reps": [8, 8, 6] }, { "load": 105, "reps": [6, 6, 5] }, { "load": 115, "reps": [10, 10, 10] }],
+      "want": { "load": 120, "sets": [{ "count": 3, "reps_min": 10 }] }
+    },
+    {
+      "name": "stages total_reps: a last set that went further makes up for a short one",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "kg" }, "success": "total_reps", "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 100, "reps": [3, 3, 3, 2, 4] }],
+      "want": { "load": 105, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }] }
+    },
+    {
+      "name": "stages all_sets: the same session moves to the next stage",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "kg" }, "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 100, "reps": [3, 3, 3, 2, 4] }],
+      "want": { "load": 100, "sets": [{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }] }
+    },
+    {
+      "name": "stages total_reps: too few sets is short however many reps",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 4, "reps_min": 3 }, { "count": 1, "reps_min": 3, "amrap": true }], "load": { "type": "last" }, "progression": { "type": "stages", "increment": { "value": 5, "unit": "kg" }, "success": "total_reps", "stages": [[{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }]], "restart": { "from": "last", "drop_percent": 15 } } },
+      "sessions": [{ "load": 100, "reps": [3, 3, 3, 8] }],
+      "want": { "load": 100, "sets": [{ "count": 5, "reps_min": 2 }, { "count": 1, "reps_min": 2, "amrap": true }] }
+    },
+    {
+      "name": "variations: no sessions starts at the slot's own step",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:push-up" }, "sets": [{ "count": 3, "reps_min": 5, "reps_max": 15 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:incline-push-up" }, { "id": "oec:push-up" }, { "id": "oec:diamond-push-up" }], "reps": 15 } },
+      "sessions": [],
+      "want": { "exercise": "oec:push-up" }
+    },
+    {
+      "name": "variations: every set at the threshold moves to the next step",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:push-up" }, "sets": [{ "count": 3, "reps_min": 5, "reps_max": 15 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:incline-push-up" }, { "id": "oec:push-up" }, { "id": "oec:diamond-push-up" }], "reps": 15 } },
+      "sessions": [{ "reps": [15, 15, 15] }],
+      "want": { "exercise": "oec:diamond-push-up" }
+    },
+    {
+      "name": "variations: one set short stays on the step",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:push-up" }, "sets": [{ "count": 3, "reps_min": 5, "reps_max": 15 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:incline-push-up" }, { "id": "oec:push-up" }, { "id": "oec:diamond-push-up" }], "reps": 15 } },
+      "sessions": [{ "reps": [15, 15, 12] }],
+      "want": { "exercise": "oec:push-up" }
+    },
+    {
+      "name": "variations: an easier step the person chose counts, and moves on from there",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:push-up" }, "sets": [{ "count": 3, "reps_min": 5, "reps_max": 15 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:incline-push-up" }, { "id": "oec:push-up" }, { "id": "oec:diamond-push-up" }], "reps": 15 } },
+      "sessions": [{ "exercise": "oec:incline-push-up", "reps": [15, 15, 15] }],
+      "want": { "exercise": "oec:push-up" }
+    },
+    {
+      "name": "variations: the last step stays",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:push-up" }, "sets": [{ "count": 3, "reps_min": 5, "reps_max": 15 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:incline-push-up" }, { "id": "oec:push-up" }, { "id": "oec:diamond-push-up" }], "reps": 15 } },
+      "sessions": [{ "reps": [15, 15, 15] }, { "exercise": "oec:diamond-push-up", "reps": [15, 15, 15] }],
+      "want": { "exercise": "oec:diamond-push-up" }
+    },
+    {
+      "name": "variations: unknown reps never count as reached",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:push-up" }, "sets": [{ "count": 3, "reps_min": 5, "reps_max": 15 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:incline-push-up" }, { "id": "oec:push-up" }, { "id": "oec:diamond-push-up" }], "reps": 15 } },
+      "sessions": [{ "reps": [15, 15, null] }],
+      "want": { "exercise": "oec:push-up" }
+    },
+    {
+      "name": "variations: timed sets move on at the hold",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:plank" }, "sets": [{ "count": 3, "duration_s": 30 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:plank" }, { "id": "oec:plank-with-leg-lift" }], "hold_s": 60 } },
+      "sessions": [{ "holds": [60, 60, 61] }],
+      "want": { "exercise": "oec:plank-with-leg-lift" }
+    },
+    {
+      "name": "variations: a hold short stays on the step",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:plank" }, "sets": [{ "count": 3, "duration_s": 30 }], "load": { "type": "choice" }, "progression": { "type": "variations", "ladder": [{ "id": "oec:plank" }, { "id": "oec:plank-with-leg-lift" }], "hold_s": 60 } },
+      "sessions": [{ "holds": [60, 45, 60] }],
+      "want": { "exercise": "oec:plank" }
+    },
+    {
+      "name": "training max: no sessions works from the starting training max",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "percent_training_max", "value": 85 }, "progression": { "type": "linear", "increment": { "value": 10, "unit": "lb" }, "on_fail": { "after_misses": 1, "drop_percent": 10 } } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [],
+      "want": { "load": 170 }
+    },
+    {
+      "name": "training max: every set done adds the increment to the training max",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "percent_training_max", "value": 85 }, "progression": { "type": "linear", "increment": { "value": 10, "unit": "lb" }, "on_fail": { "after_misses": 1, "drop_percent": 10 } } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [{ "load": 170, "reps": [5, 5, 8] }],
+      "want": { "load": 177.5 }
+    },
+    {
+      "name": "training max: it keeps moving, and the load rounds down",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "percent_training_max", "value": 85 }, "progression": { "type": "linear", "increment": { "value": 10, "unit": "lb" }, "on_fail": { "after_misses": 1, "drop_percent": 10 } } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [{ "load": 170, "reps": [5, 5, 8] }, { "load": 177.5, "reps": [5, 5, 6] }],
+      "want": { "load": 185 }
+    },
+    {
+      "name": "training max: a miss takes on_fail's drop off the training max",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 2, "reps_min": 5 }, { "count": 1, "reps_min": 5, "amrap": true }], "load": { "type": "percent_training_max", "value": 85 }, "progression": { "type": "linear", "increment": { "value": 10, "unit": "lb" }, "on_fail": { "after_misses": 1, "drop_percent": 10 } } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [{ "load": 170, "reps": [5, 5, 8] }, { "load": 177.5, "reps": [5, 5, 3] }],
+      "want": { "load": 160 }
+    },
+    {
+      "name": "training max table: the AMRAP set's band moves the training max",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 1, "reps_min": 1, "amrap": true }], "load": { "type": "percent_training_max", "value": 95 }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 2, "increment": { "value": 5, "unit": "lb" } }, { "reps_min": 4, "increment": { "value": 10, "unit": "lb" } }, { "reps_min": 6, "increment": { "value": 15, "unit": "lb" } }] } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [{ "load": 190, "reps": [3] }],
+      "want": { "load": 192.5 }
+    },
+    {
+      "name": "training max table: the top band",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 1, "reps_min": 1, "amrap": true }], "load": { "type": "percent_training_max", "value": 95 }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 2, "increment": { "value": 5, "unit": "lb" } }, { "reps_min": 4, "increment": { "value": 10, "unit": "lb" } }, { "reps_min": 6, "increment": { "value": 15, "unit": "lb" } }] } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [{ "load": 190, "reps": [7] }],
+      "want": { "load": 202.5 }
+    },
+    {
+      "name": "training max table: below every band holds it",
+      "unit": "lb",
+      "slot": { "exercise": { "id": "oec:barbell-bench-press" }, "sets": [{ "count": 1, "reps_min": 1, "amrap": true }], "load": { "type": "percent_training_max", "value": 95 }, "progression": { "type": "increment_table", "bands": [{ "reps_min": 2, "increment": { "value": 5, "unit": "lb" } }] } },
+      "start": { "value": 200, "unit": "lb" },
+      "sessions": [{ "load": 190, "reps": [1] }],
+      "want": { "load": 190 }
+    },
+    {
+      "name": "no sessions: the starting weight",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" } } },
+      "start": { "value": 60, "unit": "kg" },
+      "sessions": [],
+      "want": { "load": 60 }
+    },
+    {
+      "name": "no sessions and no start: needs a starting weight",
+      "unit": "kg",
+      "slot": { "exercise": { "id": "oec:barbell-back-squat" }, "sets": [{ "count": 3, "reps_min": 5 }], "load": { "type": "last" }, "progression": { "type": "linear", "increment": { "value": 2.5, "unit": "kg" } } },
+      "sessions": [],
+      "want": { "needs_start": true }
+    }
+  ]
+}

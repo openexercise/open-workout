@@ -44,6 +44,7 @@
         "exercise": { "$ref": "#/$defs/exerciseRef" },
         "sets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/setGroup" } },
         "load": { "$ref": "#/$defs/loadPrescription" },
+        "progression": { "$ref": "#/$defs/progressionRule" },
         "rest_seconds": { "type": "integer", "minimum": 0 },
         "substitutes": { "type": "array", "items": { "$ref": "#/$defs/exerciseRef" } },
         "notes": { "type": "string" }
@@ -73,15 +74,91 @@
     },
     "loadPrescription": {
       "type": "object",
-      "description": "How to pick the load. Value and unit depend on the type: percent_training_max and rpe take a value, last_plus a value and unit, choice neither.",
+      "description": "Where the load comes from. percent_training_max and rpe take a value; last and choice take none.",
       "required": ["type"],
       "additionalProperties": false,
       "properties": {
-        "type": { "enum": ["percent_training_max", "rpe", "last_plus", "choice"] },
-        "value": { "type": "number" },
-        "unit": { "enum": ["kg", "lb"] },
-        "after_misses": { "type": "integer", "minimum": 1, "description": "A failure rule on last_plus: after this many sessions short at one weight." },
-        "drop_percent": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 100, "description": "Take this much off when the failure rule applies." }
+        "type": {
+          "enum": ["percent_training_max", "rpe", "last", "choice"],
+          "description": "last: the load used last time on this slot, moved by the slot's progression rule. choice: the person's own pick."
+        },
+        "value": { "type": "number" }
+      }
+    },
+    "weight": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "enum": ["kg", "lb"] }
+      }
+    },
+    "failureRule": {
+      "type": "object",
+      "description": "After this many sessions in a row short of the slot's sets at one load, take drop_percent off and build back up. A session with reps unknown is neither short nor done.",
+      "required": ["after_misses", "drop_percent"],
+      "additionalProperties": false,
+      "properties": {
+        "after_misses": { "type": "integer", "minimum": 1 },
+        "drop_percent": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 100 }
+      }
+    },
+    "progressionRule": {
+      "type": "object",
+      "description": "How the next session's load follows from the last one, on a slot whose load is last. A target is worked out when read and never changes the program or a past workout. Short means a set below its reps_min, or fewer sets than the slot asks for: the load stays, and on_fail decides when it drops. linear: done (success) adds increment. double: every set at its reps_max adds increment; otherwise add reps at the same load. increment_table: the slot's AMRAP set picks the highest band whose reps_min it reached and adds that band's increment; below every band, the load stays. stages: the slot's sets are the first stage and stages lists the ones after it; every set done adds increment at the same stage, a short session moves to the next stage at the same load, and a short session on the last stage starts again at the first stage from restart. The current stage follows from replaying the program's sessions in order, each read against the stage it was suggested at. Sessions of an exercise count for a slot only when logged on a day whose slot for that exercise has the same load and rule. variations, on a slot whose load is choice: moves the exercise, not the weight. ladder lists exercises easiest first, the slot's own among them; the step to do is the one logged last time (any step counts as the slot), or the next one when every planned set of it reached reps (rep sets) or hold_s seconds (timed sets). Unknown reps or times never count as reached. Every step of a ladder is measured the way the slot's sets are. linear and increment_table on a slot whose load is percent_training_max move the lift's training max instead of a load: start from the person's training max, then, oldest first, every session logged on a training-max slot of that lift with a rule adds what the rule adds when met, and counts a miss when short (on_fail takes its drop off the training max). Sessions on slots without a rule, or on no known day, leave it alone. Every percentage slot of the lift works from the result.",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["linear", "double", "increment_table", "stages", "variations"] },
+        "ladder": {
+          "type": "array",
+          "minItems": 2,
+          "description": "variations only: Open Exercise IDs, easiest first, each once, including the slot's own exercise.",
+          "items": { "$ref": "#/$defs/exerciseRef" }
+        },
+        "hold_s": { "type": "integer", "minimum": 1, "description": "variations on timed sets: the hold every set must reach to move on." },
+        "increment": { "$ref": "#/$defs/weight", "description": "linear, double and stages: what a successful session adds." },
+        "stages": {
+          "type": "array",
+          "minItems": 1,
+          "description": "stages only: the set schemes after the slot's own sets, in order. Sets with reps.",
+          "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/setGroup" } }
+        },
+        "restart": {
+          "type": "object",
+          "description": "stages only, and required there: the load to start the first stage again from, after a short session on the last stage. The base load, less drop_percent, plus add, rounded down. Give drop_percent, add or both.",
+          "required": ["from"],
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "enum": ["last", "first_stage_success"],
+              "description": "last: the load of the short session. first_stage_success: the last load every set of the first stage was done at (last when there is none)."
+            },
+            "drop_percent": { "type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 100 },
+            "add": { "$ref": "#/$defs/weight" }
+          }
+        },
+        "success": {
+          "enum": ["all_sets", "total_reps", "amrap"],
+          "description": "linear: all_sets (the default): every set reached its reps_min. total_reps: the sets' reps add up to at least reps. amrap: the slot's AMRAP set reached at least reps. stages: all_sets (the default), or total_reps, where every set of the stage is there and their reps add up to at least the stage's reps_min, so a set that went further makes up for a short one."
+        },
+        "reps": { "type": "integer", "minimum": 1, "description": "The threshold for success total_reps or amrap, or, on variations, the reps every set must reach to move on." },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "description": "increment_table only, in rising reps_min.",
+          "items": {
+            "type": "object",
+            "required": ["reps_min", "increment"],
+            "additionalProperties": false,
+            "properties": {
+              "reps_min": { "type": "integer", "minimum": 0 },
+              "increment": { "$ref": "#/$defs/weight" }
+            }
+          }
+        },
+        "on_fail": { "$ref": "#/$defs/failureRule" }
       }
     }
   }
