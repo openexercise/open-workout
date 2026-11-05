@@ -609,6 +609,35 @@
     },
     {
       "_meta": {
+        "dev.openworkout/profile": "lifterclub"
+      },
+      "annotations": {
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Match up to 50 exercise names, for example from a plan or another app, to Open Exercise catalogue IDs without logging anything. Each name comes back catalogue (sure), close (confirm with the user) or unmatched, with candidates. It uses the shared catalogue only, not the user's own exercises or the names they've taught; use search_exercises for those.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "names": {
+            "description": "exercise names as written, 1 to 50",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "type": "object"
+      },
+      "name": "match_exercises",
+      "title": "Match exercise names"
+    },
+    {
+      "_meta": {
         "dev.openworkout/profile": "core"
       },
       "annotations": {

@@ -6,6 +6,10 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-05: The MCP profile's README adds what an AI client keeps to: log only what the person
+  said, ask on `needs_confirmation`, show the summary and `warnings`, respect calm mode, and send
+  an `idempotency_key`. The reference server adds the extension tool `match_exercises`. The core is
+  unchanged.
 - 2026-11-05: The MCP tool profile splits into a core and extensions. Each tool's `_meta` names
   its profile under `dev.openworkout/profile` (`core`, or `lifterclub` for the reference server's
   own); `instructions` are the core's and name no product, with the reference server's in

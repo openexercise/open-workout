@@ -547,6 +547,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Match exercise names to Open Exercise IDs
+         * @description For an app, with its own token from the client_credentials grant (scope `catalogue:match`),
+         *     never a person's: a confidential client asks `/oauth/token` with `grant_type=client_credentials`.
+         *     Each name is matched against the shared Open Exercise catalogue only, the way Lifterclub
+         *     matches what people log (exact names and aliases, abbreviations, then similarity), without
+         *     any person's own exercises or learned names. Nothing is stored. One call counts once against
+         *     the app's read budget, however many names it sends.
+         *
+         *     `catalogue` is a sure match; `close` is likely, and the app should let its user confirm it;
+         *     `unmatched` has no exercise, and its candidates, if any, are guesses to offer.
+         */
+        post: operations["matchExercises"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/webhooks": {
         parameters: {
             query?: never;
@@ -1535,6 +1563,26 @@ export interface components {
                 notes?: string;
                 progression?: components["schemas"]["RoutineRule"];
             }[];
+        };
+        MatchRequest: {
+            /**
+             * @example [
+             *       "db bench",
+             *       "rdl",
+             *       "flurbo lift"
+             *     ]
+             */
+            names: string[];
+        };
+        NameMatch: {
+            /** @description The name as sent. */
+            name: string;
+            /** @enum {unknown} */
+            status: "catalogue" | "close" | "unmatched";
+            /** @description The best match; null when unmatched. */
+            exercise: components["schemas"]["Candidate"] | null;
+            confidence: number;
+            candidates: components["schemas"]["Candidate"][];
         };
         Match: {
             phrase: string;
@@ -3140,6 +3188,36 @@ export interface operations {
                     "application/json": components["schemas"]["PartnerList"];
                 };
             };
+        };
+    };
+    matchExercises: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchRequest"];
+            };
+        };
+        responses: {
+            /** @description One match per name, in the order sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        matches: components["schemas"]["NameMatch"][];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
         };
     };
     listWebhooks: {
