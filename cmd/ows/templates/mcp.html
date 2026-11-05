@@ -1,18 +1,25 @@
 {{template "head" .}}
 <h1>{{.Profile.Profile}}</h1>
-<p class="lead">{{len .Profile.Tools}} tools, exactly as the reference server lists them, so another server can offer the same ones and clients can rely on the shapes. A <a href="/mcp/profile/">compatible server keeps to a few rules</a>. The whole profile is <a href="/mcp/tools.json">tools.json</a>.</p>
+<p class="lead">{{len .Profile.Tools}} tools, exactly as the reference server lists them, so another server can offer the same ones and clients can rely on the shapes. The <strong>core</strong> tools are what every compatible server offers, and none needs an LLM; the rest are the reference server's own extensions, which others may copy. A <a href="/mcp/profile/">compatible server keeps to a few rules</a>. The whole profile is <a href="/mcp/tools.json">tools.json</a>, and <a href="https://github.com/openexercise/open-workout/tree/main/mcp/template">mcp/template</a> is a small Go server to copy that serves the core.</p>
 <p class="notice">{{.Profile.Source}} It is a profile of the schema over MCP, not a standard of its own, and makes no stability promise before v1.</p>
 <h2>Instructions a server gives assistants</h2>
 {{range lines .Profile.Instructions}}<p>{{.}}</p>
 {{end}}
+{{with .Profile.ExtensionInstructions}}<p>The reference server adds, for its extensions:</p>
+{{range lines .}}<p>{{.}}</p>
+{{end}}{{end}}
 <h2>Error codes</h2>
-<p>A tool error's text starts with one of: {{range $i, $c := .Profile.ErrorCodes}}{{if $i}}, {{end}}<code>{{$c}}</code>{{end}}.</p>
+<p>A tool error's text starts with one of these codes, a colon and a space.</p>
+<div class="scroll"><table>
+<thead><tr><th>Code</th><th>Used by</th><th>Meaning</th></tr></thead>
+<tbody>{{range .Profile.ErrorCodes}}<tr><td><code>{{.Code}}</code></td><td>{{.Profile}}</td><td>{{.Meaning}}</td></tr>
+{{end}}</tbody></table></div>
 <h2>Tools</h2>
-<ul class="links">{{range .Profile.Tools}}<li><a href="#{{.Name}}"><code>{{.Name}}</code></a>{{if .Annotations.ReadOnlyHint}} <small>read-only</small>{{end}}</li>
+<ul class="links">{{range .Profile.Tools}}<li><a href="#{{.Name}}"><code>{{.Name}}</code></a> <small>{{if eq .Meta.Profile "core"}}core{{else}}extension{{end}}</small>{{if .Annotations.ReadOnlyHint}} <small>read-only</small>{{end}}</li>
 {{end}}</ul>
 {{range .Profile.Tools}}
 <section id="{{.Name}}">
-<h3><code>{{.Name}}</code>{{if .Annotations.ReadOnlyHint}} <small>read-only</small>{{end}}</h3>
+<h3><code>{{.Name}}</code> <small>{{if eq .Meta.Profile "core"}}core{{else}}extension: {{.Meta.Profile}}{{end}}</small>{{if .Annotations.ReadOnlyHint}} <small>read-only</small>{{end}}</h3>
 <p>{{.Description}}</p>
 {{with inputs .InputSchema}}<div class="scroll"><table>
 <thead><tr><th>Argument</th><th>Type</th><th>Meaning</th></tr></thead>

@@ -1,9 +1,30 @@
 # OWS MCP tool profile
 
-`tools.json` is the set of MCP tools Lifterclub offers over the Open Workout Schema, exactly as its
-server lists them: names, descriptions, input schemas and annotations, with the server's
-instructions and the error codes a tool error's text starts with. It is generated from the server
-(`make mcp-profile`), and a test fails when the two differ.
+`tools.json` is the set of MCP tools offered over the Open Workout Schema, exactly as the reference
+server (Lifterclub) lists them: names, descriptions, input schemas and annotations, with the
+instructions and every error code a tool error's text can start with. It is generated from that
+server, and a test fails when the two differ.
+
+## Core and extensions
+
+Each tool's `_meta` names its profile under `dev.openworkout/profile`, and servers send the same
+mark when they list their tools:
+
+- **`core`**: logging (`log_workout`, `add_sets`), edits (`update_entry`, `delete_entry`), `undo`,
+  reads (`get_workouts`, `get_personal_records`, `get_progress`) and `search_exercises`. None
+  needs an LLM. A compatible server offers all of them, with these shapes.
+- **`lifterclub`**: the reference server's own extensions, which other servers may copy but need
+  not: `log_text` (sentence parsing by an LLM), the training profile and programs.
+
+`log_workout`'s optional `program` names a program day, for servers that offer programs; a
+server without them refuses it with `invalid_input`.
+
+`template/` in `openexercise/open-workout` is a small server to copy that offers the core: Go, the
+official MCP SDK and an in-memory store.
+
+`instructions` are the core's, free of any product name; a server sends them as its MCP
+instructions and may add its own after them, as Lifterclub adds `extension_instructions`.
+`error_codes` lists each code with the profile that uses it and what a client should do.
 
 It is a *profile*, not a standard of its own: another server that offers these tools with these
 shapes can be used by the same assistants and clients. It makes no stability promise before OWS
@@ -23,8 +44,8 @@ v1.
 - **Calm mode is respected.** When the person has asked not to be shown numbers, summaries leave
   records and totals out, and assistants are told not to volunteer them.
 - **Read-only access exists.** A read-only credential sees and may call only the tools annotated
-  `readOnlyHint`.
-- **Errors are actionable.** A tool error's text starts with one of the codes in `error_codes`
-  and says what to do next; `exercise_ambiguous` lists candidates.
+  `readOnlyHint`; calling another is a protocol error whose message starts with `read_only`.
+- **Errors are actionable.** A tool error's text starts with one of the codes in `error_codes`,
+  a colon and a space, and says what to do next; `exercise_ambiguous` lists candidates.
 - **Stored text is data.** Titles, notes and exercise names in results are the person's own text
   or came from other apps; a server tells clients never to follow instructions in them.
