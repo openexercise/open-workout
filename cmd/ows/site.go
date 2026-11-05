@@ -136,13 +136,17 @@ func buildSite(root, out string) error {
 		}
 	}
 
-	// The schema files at their $id paths, the progression rules' worked cases, the profile, the
+	// The schema files at their $id paths, the progression rules' and webhook signatures' worked
+	// cases, the profile, the
 	// examples, and the stylesheet.
 	copies := map[string]string{
-		"schema/v0/workout.json":             filepath.Join(root, "schema", "v0", "workout.json"),
-		"schema/v0/program.json":             filepath.Join(root, "schema", "v0", "program.json"),
-		"schema/v0/progression-vectors.json": filepath.Join(root, "schema", "v0", "progression-vectors.json"),
-		"mcp/tools.json":                     filepath.Join(root, "mcp", "tools.json"),
+		"schema/v0/workout.json":                   filepath.Join(root, "schema", "v0", "workout.json"),
+		"schema/v0/program.json":                   filepath.Join(root, "schema", "v0", "program.json"),
+		"schema/v0/routine.json":                   filepath.Join(root, "schema", "v0", "routine.json"),
+		"schema/v0/log.json":                       filepath.Join(root, "schema", "v0", "log.json"),
+		"schema/v0/progression-vectors.json":       filepath.Join(root, "schema", "v0", "progression-vectors.json"),
+		"schema/v0/webhook-signature-vectors.json": filepath.Join(root, "schema", "v0", "webhook-signature-vectors.json"),
+		"mcp/tools.json":                           filepath.Join(root, "mcp", "tools.json"),
 	}
 	examples, _ := filepath.Glob(filepath.Join(root, "examples", "*.json"))
 	for _, e := range examples {

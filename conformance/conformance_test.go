@@ -15,18 +15,22 @@ import (
 // reference is an in-memory server keeping to the reference API as far as the script goes. A
 // broken field turns one behaviour off, so a test can check the right check catches it.
 type reference struct {
-	mu       sync.Mutex
-	next     int
-	byID     map[string]map[string]any
-	keys     map[string]string
-	external map[string]string
-	deleted  map[string]bool
+	mu        sync.Mutex
+	next      int
+	byID      map[string]map[string]any
+	keys      map[string]string
+	external  map[string]string
+	deleted   map[string]bool
+	deletedAt map[string]string
+	hooks     map[string]bool
 
 	noChallenge, noReplay, noExternalReplay, revives, loseNotes, badExport bool
+	noFeed, noTombstones, listsSecret                                      bool
 }
 
 func newReference() *reference {
-	return &reference{byID: map[string]map[string]any{}, keys: map[string]string{}, external: map[string]string{}, deleted: map[string]bool{}}
+	return &reference{byID: map[string]map[string]any{}, keys: map[string]string{}, external: map[string]string{}, deleted: map[string]bool{},
+		deletedAt: map[string]string{}, hooks: map[string]bool{}}
 }
 
 func (s *reference) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +46,10 @@ func (s *reference) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodPost && r.URL.Path == "/v1/workouts":
 		s.create(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/v1/workouts":
+		s.feed(w)
+	case r.URL.Path == "/v1/webhooks" || strings.HasPrefix(r.URL.Path, "/v1/webhooks/"):
+		s.webhooks(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/v1/export":
 		s.export(w)
 	case strings.HasPrefix(r.URL.Path, "/v1/workouts/"):
@@ -67,6 +75,7 @@ func (s *reference) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]any{"workout": wk})
 		case http.MethodDelete:
 			s.deleted[id] = true
+			s.deletedAt[id] = time.Now().UTC().Format(time.RFC3339Nano)
 			writeJSON(w, http.StatusOK, map[string]any{"undo_token": "u"})
 		}
 	default:
@@ -147,6 +156,44 @@ func (s *reference) export(w http.ResponseWriter) {
 	writeJSON(w, http.StatusOK, map[string]any{"exported_at": time.Now().UTC(), "workouts": out, "routines": []any{}})
 }
 
+// feed is the change feed: every stored workout, and the deleted ones as tombstones.
+func (s *reference) feed(w http.ResponseWriter) {
+	workouts, deleted := []any{}, []any{}
+	for id, wk := range s.byID {
+		switch {
+		case s.noFeed:
+		case !s.deleted[id]:
+			workouts = append(workouts, wk)
+		case !s.noTombstones:
+			deleted = append(deleted, map[string]any{"id": id, "deleted_at": s.deletedAt[id], "updated_at": s.deletedAt[id]})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"workouts": workouts, "deleted": deleted})
+}
+
+func (s *reference) webhooks(w http.ResponseWriter, r *http.Request) {
+	switch {
+	case r.Method == http.MethodPost:
+		s.next++
+		id := fmt.Sprintf("wh_%d", s.next)
+		s.hooks[id] = true
+		writeJSON(w, http.StatusCreated, map[string]any{"id": id, "secret": "whsec"})
+	case r.Method == http.MethodGet:
+		var list []any
+		for id := range s.hooks {
+			h := map[string]any{"id": id}
+			if s.listsSecret {
+				h["secret"] = "whsec"
+			}
+			list = append(list, h)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"webhooks": list})
+	case r.Method == http.MethodDelete:
+		delete(s.hooks, strings.TrimPrefix(r.URL.Path, "/v1/webhooks/"))
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -187,11 +234,14 @@ func TestReferenceServerPasses(t *testing.T) {
 		}
 		t.Fatal("the reference server should pass")
 	}
-	// The run cleans up after itself: its one workout is deleted.
+	// The run cleans up after itself: its one workout is deleted, and its webhook removed.
 	for id := range s.byID {
 		if !s.deleted[id] {
 			t.Errorf("%s left stored", id)
 		}
+	}
+	if len(s.hooks) > 0 {
+		t.Errorf("webhooks left subscribed: %v", s.hooks)
 	}
 }
 
@@ -209,6 +259,9 @@ func TestEachCheckCatchesItsBehaviour(t *testing.T) {
 		{"notes not changed", func(s *reference) { s.loseNotes = true }, []string{"update"}},
 		{"invalid export", func(s *reference) { s.badExport = true }, []string{"export"}},
 		{"deleted comes back", func(s *reference) { s.revives = true }, []string{"stays-deleted"}},
+		{"no change feed", func(s *reference) { s.noFeed = true }, []string{"change-feed", "tombstone"}},
+		{"no tombstones", func(s *reference) { s.noTombstones = true }, []string{"tombstone"}},
+		{"secret listed", func(s *reference) { s.listsSecret = true }, []string{"webhooks"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -254,8 +307,12 @@ func TestCreateFailureSkipsTheRest(t *testing.T) {
 		t.Errorf("create detail %q should name the problem code", report.Results[1].Detail)
 	}
 	for _, name := range Checks[2:] {
-		if got[name] != Skip {
-			t.Errorf("%s = %s, want skip", name, got[name])
+		want := Skip
+		if name == "webhooks" { // needs no workout, so it runs, and fails here like everything else
+			want = Fail
+		}
+		if got[name] != want {
+			t.Errorf("%s = %s, want %s", name, got[name], want)
 		}
 	}
 	if report.Passed() {

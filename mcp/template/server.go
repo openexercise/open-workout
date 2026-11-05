@@ -188,7 +188,39 @@ func NewServer(store *Store) (*mcp.Server, error) {
 	if len(tools) != len(handlers) {
 		return nil, fmt.Errorf("this server handles %d tools, but the profile's core has %d", len(handlers), len(tools))
 	}
+	readOnly := map[string]bool{}
+	for _, t := range tools {
+		if t.Annotations != nil && t.Annotations.ReadOnlyHint {
+			readOnly[t.Name] = true
+		}
+	}
+	srv.AddReceivingMiddleware(limitToScope(readOnly))
 	return srv, nil
+}
+
+// readScope is a credential that may only read.
+const readScope = "mcp:read"
+
+// limitToScope keeps a read-only credential to the tools annotated readOnlyHint: it isn't shown
+// the others, and calling one is a protocol error starting read_only. Doing it here, not in each
+// handler, means a new write tool can't forget.
+func limitToScope(readOnly map[string]bool) mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			extra := req.GetExtra()
+			if extra == nil || extra.TokenInfo == nil || slices.Contains(extra.TokenInfo.Scopes, "mcp") {
+				return next(ctx, method, req)
+			}
+			if call, ok := req.(*mcp.CallToolRequest); ok && !readOnly[call.Params.Name] {
+				return nil, fmt.Errorf("read_only: this credential can only read; %s changes the log", call.Params.Name)
+			}
+			res, err := next(ctx, method, req)
+			if list, ok := res.(*mcp.ListToolsResult); ok && err == nil {
+				list.Tools = slices.DeleteFunc(slices.Clone(list.Tools), func(t *mcp.Tool) bool { return !readOnly[t.Name] })
+			}
+			return res, err
+		}
+	}
 }
 
 // toolHandler runs a handler for the person the request's credential names, and returns its
