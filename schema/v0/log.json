@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openworkout.dev/schema/v0/log.json",
+  "title": "Open Workout Schema v0: log",
+  "description": "A person's whole workout log as one file: what an export holds and an import can read. Workouts and routines are OWS documents. A server may add more of the person's record beside them (a profile, say), under keys this schema doesn't name; readers ignore keys they don't know. Draft; may change until v1.",
+  "type": "object",
+  "required": ["exported_at", "workouts"],
+  "properties": {
+    "$schema": { "const": "https://openworkout.dev/schema/v0/log.json" },
+    "exported_at": { "type": "string", "format": "date-time" },
+    "workouts": {
+      "description": "Every workout in the log, newest first.",
+      "type": "array",
+      "items": { "$ref": "workout.json" }
+    },
+    "routines": {
+      "description": "The person's routines.",
+      "type": "array",
+      "items": { "$ref": "routine.json" }
+    },
+    "deleted_workouts": {
+      "description": "Workouts the person deleted, or that a merge with another app's record of the same session hid (merged_into), newest first. A server that keeps them until the account is deleted includes them, so the file holds the whole record.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["deleted_at", "workout"],
+        "additionalProperties": false,
+        "properties": {
+          "deleted_at": { "type": "string", "format": "date-time" },
+          "merged_into": { "type": "string", "description": "The workout this one was merged into." },
+          "workout": { "$ref": "workout.json" }
+        }
+      }
+    }
+  }
+}

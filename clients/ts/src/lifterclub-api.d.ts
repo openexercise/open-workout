@@ -598,10 +598,11 @@ export interface paths {
         /**
          * Download the whole log
          * @description Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
-         *     and a server may add more of the record beside them (Lifterclub adds the routines and program
-         *     runs, and the profile if the credential has `profile:read`). `csv` has one row per set; free
-         *     text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it.
-         *     Deleted workouts aren't part of the log. A server may limit how often it runs (Lifterclub: 10
+         *     and a server may add more of the record beside them (Lifterclub adds the routines, program
+         *     runs, imports, consent history and the workouts the person deleted, so the file answers an
+         *     access request in full, and the profile if the credential has `profile:read`). `csv` has one
+         *     row per set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
+         *     don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
          *     an hour per account). If it fails part way the connection is cut, so an incomplete file never
          *     looks finished.
          */
@@ -1261,20 +1262,36 @@ export interface components {
                 is_default: boolean;
             }[];
         };
-        /** @description The log as the Open Workout core promises it. A server may add more of the person's record beside the workouts. */
-        OWSExport: {
-            /** Format: date-time */
-            exported_at: string;
-            workouts: components["schemas"]["workout"][];
-        };
+        /** @description The log as the Open Workout core promises it, an OWS v0 log document (https://openworkout.dev/schema/v0/log.json). A server may add more of the person's record beside its keys. */
+        OWSExport: components["schemas"]["log"];
         LogExport: {
             /** Format: date-time */
             exported_at: string;
             profile?: components["schemas"]["Profile"];
+            /** @description Every import the person ran, newest first, as GET /v1/imports/{id} shows it. */
+            imports: components["schemas"]["ImportJob"][];
+            /** @description Every consent the person gave, oldest first, and when they withdrew it. */
+            consents: {
+                /** @enum {string} */
+                kind: "health_data" | "program_counts";
+                version: string;
+                /** Format: date-time */
+                granted_at: string;
+                /** Format: date-time */
+                withdrawn_at: string | null;
+            }[];
             routines: components["schemas"]["Routine"][];
             program_suggestions_dismissed: string[];
             program_enrollments: components["schemas"]["ProgramEnrollment"][];
             workouts: components["schemas"]["workout"][];
+            /** @description The workouts the person deleted, and those a merge with another app's record hid (`merged_into`), newest first. They stay stored until the account is deleted, so the export holds them too. */
+            deleted_workouts: {
+                /** Format: date-time */
+                deleted_at: string;
+                /** Format: uuid */
+                merged_into?: string;
+                workout: components["schemas"]["workout"];
+            }[];
         };
         ProgramNumber: {
             value: number;
@@ -1971,7 +1988,7 @@ export interface components {
             /** @description linear with stages only, and required there: the drop that makes this many at one set scheme also moves on to the next scheme (StrongLifts: 5x5, then 3x5, then 3x3). */
             stage_after_drops?: number;
         };
-        /** @description How the next session's load follows from the last one, on a slot whose load is last. A target is worked out when read and never changes the program or a past workout. Short means a set below its reps_min, or fewer sets than the slot asks for: the load stays, and on_fail decides when it drops. Missing data holds: a session with reps unknown on a set the rule reads, none missing and none logged short, is neither done nor short, so the load, stage and training max stay and a run of misses neither grows nor ends. linear: done (success) adds increment. A linear rule may carry stages: its on_fail drops as usual, and the drop that makes stage_after_drops drops at one set scheme also moves on to the next scheme (the last one stays), replayed in order like stages, each session read against the scheme it was suggested at; success is then all_sets. Where a rule reads an AMRAP set (increment_table, or linear with success amrap), it reads amrap_set when given, else the slot's last AMRAP set. double: every set at its reps_max adds increment; otherwise add reps at the same load. increment_table: the slot's AMRAP set picks the highest band whose reps_min it reached and adds that band's increment; below every band, the load stays. stages: the slot's sets are the first stage and stages lists the ones after it; every set done adds increment at the same stage, a short session moves to the next stage at the same load, and a short session on the last stage starts again at the first stage from restart. The current stage follows from replaying the program's sessions in order, each read against the stage it was suggested at. Sessions of an exercise count for a slot only when logged on a day whose slot for that exercise has the same load and rule. variations, on a slot whose load is choice: moves the exercise, not the weight. ladder lists exercises easiest first, the slot's own among them; the step to do is the one logged last time (any step counts as the slot), or the next one when every planned set of it reached reps (rep sets) or hold_s seconds (timed sets). Unknown reps or times never count as reached. Every step of a ladder is measured the way the slot's sets are. linear and increment_table on a slot whose load is percent_training_max move the lift's training max instead of a load: start from the person's training max, then, oldest first, every session logged on a training-max slot of that lift with a rule adds what the rule adds when met, and counts a miss when short (on_fail takes its drop off the training max). Sessions on slots without a rule, or on no known day, leave it alone. Every percentage slot of the lift works from the result. */
+        /** @description How the next session's load follows from the last one, on a slot whose load is last. A target is worked out when read and never changes the program or a past workout. Short means a set below its reps_min, or fewer sets than the slot asks for: the load stays, and on_fail decides when it drops. Missing data holds: a session with reps unknown on a set the rule reads, none missing and none logged short, is neither done nor short, so the load, stage and training max stay and a run of misses neither grows nor ends. linear: done (success) adds increment. A linear rule may carry stages: its on_fail drops as usual, and the drop that makes stage_after_drops drops at one set scheme also moves on to the next scheme (the last one stays), replayed in order like stages, each session read against the scheme it was suggested at; success is then all_sets. Where a rule reads an AMRAP set (increment_table, or linear with success amrap), it reads amrap_set when given, else the slot's last AMRAP set. double: every set at its reps_max adds increment; otherwise add reps at the same load. increment_table: the slot's AMRAP set picks the highest band whose reps_min it reached and adds that band's increment; below every band, the load stays. With success total_reps, a session is short when its sets add up to less than reps, which on_fail counts. stages: the slot's sets are the first stage and stages lists the ones after it; every set done adds increment at the same stage, a short session moves to the next stage at the same load, and a short session on the last stage starts again at the first stage from restart. The current stage follows from replaying the program's sessions in order, each read against the stage it was suggested at. Sessions of an exercise count for a slot only when logged on a day whose slot for that exercise has the same load and rule. variations, on a slot whose load is choice: moves the exercise, not the weight. ladder lists exercises easiest first, the slot's own among them; the step to do is the one logged last time (any step counts as the slot), or the next one when every planned set of it reached reps (rep sets) or hold_s seconds (timed sets). Unknown reps or times never count as reached. Every step of a ladder is measured the way the slot's sets are. linear and increment_table on a slot whose load is percent_training_max move the lift's training max instead of a load: start from the person's training max, then, oldest first, every session logged on a training-max slot of that lift with a rule adds what the rule adds when met, and counts a miss when short (on_fail takes its drop off the training max). Sessions on slots without a rule, or on no known day, leave it alone. Every percentage slot of the lift works from the result. */
         progressionRule: {
             /** @enum {unknown} */
             type: "linear" | "double" | "increment_table" | "stages" | "variations";
@@ -1994,7 +2011,7 @@ export interface components {
                 add?: components["schemas"]["weight"];
             };
             /**
-             * @description linear: all_sets (the default): every set reached its reps_min. total_reps: the sets' reps add up to at least reps. amrap: the slot's AMRAP set reached at least reps. stages: all_sets (the default), or total_reps, where every set of the stage is there and their reps add up to at least the stage's reps_min, so a set that went further makes up for a short one.
+             * @description linear: all_sets (the default): every set reached its reps_min. total_reps: the planned sets' reps add up to at least reps, and short means they don't, so a set that went further makes up for one short of its reps_min (5, 4, 6 reaches 15). increment_table may also take total_reps with reps: short then means under the total, and a session that reaches it adds the band its AMRAP set reached. amrap: the slot's AMRAP set reached at least reps. stages: all_sets (the default), or total_reps, where every set of the stage is there and their reps add up to at least the stage's reps_min, so a set that went further makes up for a short one.
              * @enum {unknown}
              */
             success?: "all_sets" | "total_reps" | "amrap";
@@ -2040,6 +2057,80 @@ export interface components {
             progression: string;
             /** @description The weeks of one cycle, repeating. */
             weeks: components["schemas"]["week"][];
+        };
+        /** @description How the row's next weight is suggested; absent means the server's default for the row's shape. linear adds the increment when every set reaches reps_min; double works up the rep range, then adds it. off makes no suggestion. */
+        rule: {
+            /** @enum {unknown} */
+            type: "linear" | "double" | "off";
+            increment?: {
+                value: number;
+                /** @enum {unknown} */
+                unit: "kg" | "lb";
+            };
+        };
+        /** @description One exercise in the routine and its targets, in order. Every target is optional: a plan may name only the exercise. */
+        row: {
+            /** @description An Open Exercise ID (oec:…), or another namespace's, such as a person's own exercise (usr:…). */
+            exercise_id: string;
+            name: string;
+            /** @description The exercise's equipment, as the server's catalogue lists it. */
+            equipment?: string[];
+            sets?: number;
+            reps_min?: number;
+            /** @description With reps_min, a rep range to work within. */
+            reps_max?: number;
+            load?: number;
+            /** @enum {unknown} */
+            unit?: "kg" | "lb";
+            duration_s?: number;
+            distance_m?: number;
+            rest_seconds?: number;
+            notes?: string;
+            progression?: components["schemas"]["rule"];
+        };
+        /**
+         * Open Workout Schema v0: routine
+         * @description A routine: a person's own plan for a session, with targets to train from. Targets are never performed work; a workout records what was done. Draft; may change until v1.
+         */
+        routine: {
+            /** @constant */
+            $schema?: "https://openworkout.dev/schema/v0/routine.json";
+            /** @description Assigned by the server that stores the routine. */
+            id?: string;
+            name: string;
+            notes?: string;
+            /** Format: date-time */
+            created_at?: string;
+            /** @description The program this routine was copied from, when it was copied from a library entry. Absent once that entry is withdrawn. */
+            source?: {
+                program_id: string;
+                program_name: string;
+                credit?: string | null;
+                version: number;
+            };
+            exercises: components["schemas"]["row"][];
+        };
+        /**
+         * Open Workout Schema v0: log
+         * @description A person's whole workout log as one file: what an export holds and an import can read. Workouts and routines are OWS documents. A server may add more of the person's record beside them (a profile, say), under keys this schema doesn't name; readers ignore keys they don't know. Draft; may change until v1.
+         */
+        log: {
+            /** @constant */
+            $schema?: "https://openworkout.dev/schema/v0/log.json";
+            /** Format: date-time */
+            exported_at: string;
+            /** @description Every workout in the log, newest first. */
+            workouts: components["schemas"]["workout"][];
+            /** @description The person's routines. */
+            routines?: components["schemas"]["routine"][];
+            /** @description Workouts the person deleted, or that a merge with another app's record of the same session hid (merged_into), newest first. A server that keeps them until the account is deleted includes them, so the file holds the whole record. */
+            deleted_workouts?: {
+                /** Format: date-time */
+                deleted_at: string;
+                /** @description The workout this one was merged into. */
+                merged_into?: string;
+                workout: components["schemas"]["workout"];
+            }[];
         };
     };
     responses: {
