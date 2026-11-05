@@ -1,4 +1,4 @@
-package lifterclub
+package openworkout
 
 import "time"
 

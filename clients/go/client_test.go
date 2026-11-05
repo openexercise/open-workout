@@ -1,4 +1,4 @@
-package lifterclub
+package openworkout
 
 import (
 	"context"
@@ -139,7 +139,7 @@ func TestProblemsBecomeErrors(t *testing.T) {
 	if !HasCode(err, CodeRateLimited) || HasCode(err, CodeNotFound) {
 		t.Error("HasCode")
 	}
-	if want := "lifterclub: rate_limited (429): at most 60 writes a minute per account, shared with MCP"; err.Error() != want {
+	if want := "openworkout: rate_limited (429): at most 60 writes a minute per account, shared with MCP"; err.Error() != want {
 		t.Errorf("Error() = %q", err)
 	}
 

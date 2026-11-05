@@ -1,4 +1,4 @@
-# Publishes clients/ts to npm as @openexercise/lifterclub-client when a tag clients-ts-v<version>
+# Publishes clients/ts to npm as @openexercise/open-workout-client when a tag clients-ts-v<version>
 # is pushed, with npm's trusted publishing: no token is stored here. npm checks that this
 # repository and this workflow file are the package's trusted publisher (package settings on
 # npmjs.com), and attaches provenance. The tag must match the version in package.json.

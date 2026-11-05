@@ -1,4 +1,4 @@
-package lifterclub
+package openworkout
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Me is the signed-in user (profile:read).
+// Me is the signed-in user (profile:read). Lifterclub extension.
 func (c *Client) Me(ctx context.Context) (*Me, error) {
 	var out Me
 	return &out, c.Do(ctx, http.MethodGet, "/v1/me", nil, nil, &out)
@@ -157,12 +157,13 @@ func (c *Client) LogWorkout(ctx context.Context, in WorkoutInput) (*Logged, erro
 
 // LogText parses the user's words and logs them in one step. A sentence the API can't read
 // reliably is CodeParseUnsure, with nothing saved: send structure to LogWorkout instead.
+// Lifterclub extension.
 func (c *Client) LogText(ctx context.Context, in TextRequest) (*Logged, error) {
 	var out Logged
 	return &out, c.Do(ctx, http.MethodPost, "/v1/workouts/from-text", nil, in, &out)
 }
 
-// Parse reads text into a draft without saving, to show the user first.
+// Parse reads text into a draft without saving, to show the user first. Lifterclub extension.
 func (c *Client) Parse(ctx context.Context, in TextRequest) (*Draft, error) {
 	var out Draft
 	return &out, c.Do(ctx, http.MethodPost, "/v1/parse", nil, in, &out)

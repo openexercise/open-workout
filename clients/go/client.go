@@ -1,11 +1,13 @@
-// Package lifterclub is a thin Go client for the Lifterclub API (https://api.lifterclub.com):
-// net/http, the access token on every request, an Idempotency-Key on every POST, RFC 9457
-// problems as errors, and keyset paging over the workout list and the change feed. Workouts are
-// Open Workout Schema v0 documents (https://openworkout.dev/schema/v0/workout.json).
+// Package openworkout is a thin Go client for an Open Workout server (the API core,
+// api/core.yaml in openexercise/open-workout): net/http, the access token on every request, an
+// Idempotency-Key on every POST, RFC 9457 problems as errors, and keyset paging over the workout
+// list and the change feed. Workouts are Open Workout Schema v0 documents
+// (https://openworkout.dev/schema/v0/workout.json).
 //
-// Getting the token is the app's job: OAuth 2.1 with PKCE, as docs/api.md in the Lifterclub
-// repository describes. Routes without a method here go through Do.
-package lifterclub
+// Methods marked "Lifterclub extension" call routes outside the core that Lifterclub, the
+// reference implementation (LifterclubURL), serves; another server may not. Getting the token is
+// the app's job: OAuth 2.1 with PKCE. Routes without a method here go through Do.
+package openworkout
 
 import (
 	"bytes"
@@ -23,8 +25,8 @@ import (
 	"time"
 )
 
-// DefaultBaseURL is the API's origin when New is given none.
-const DefaultBaseURL = "https://api.lifterclub.com"
+// LifterclubURL is the origin of Lifterclub's API, the reference implementation.
+const LifterclubURL = "https://api.lifterclub.com"
 
 // Client calls the API as one user, with their token. The zero value is not usable: use New.
 type Client struct {
@@ -43,11 +45,8 @@ type Client struct {
 	NewIdempotencyKey func() string
 }
 
-// New makes a client for the API at baseURL (DefaultBaseURL when empty) with the token.
+// New makes a client for the server at baseURL (LifterclubURL, say) with the token.
 func New(baseURL, token string) *Client {
-	if baseURL == "" {
-		baseURL = DefaultBaseURL
-	}
 	return &Client{BaseURL: strings.TrimRight(baseURL, "/"), Token: token}
 }
 
@@ -103,9 +102,9 @@ const (
 
 func (e *Error) Error() string {
 	if e.Detail == "" {
-		return fmt.Sprintf("lifterclub: %s (%d)", e.Code, e.Status)
+		return fmt.Sprintf("openworkout: %s (%d)", e.Code, e.Status)
 	}
-	return fmt.Sprintf("lifterclub: %s (%d): %s", e.Code, e.Status, e.Detail)
+	return fmt.Sprintf("openworkout: %s (%d): %s", e.Code, e.Status, e.Detail)
 }
 
 // HasCode reports whether err is an *Error with the code.
@@ -128,7 +127,7 @@ func (c *Client) Do(ctx context.Context, method, path string, query url.Values, 
 		return nil
 	}
 	if err := json.NewDecoder(res.Body).Decode(out); err != nil {
-		return fmt.Errorf("lifterclub: decode %s %s: %w", method, path, err)
+		return fmt.Errorf("openworkout: decode %s %s: %w", method, path, err)
 	}
 	return nil
 }
@@ -140,7 +139,7 @@ func (c *Client) send(ctx context.Context, method, path string, query url.Values
 	if body != nil {
 		raw, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("lifterclub: encode %s %s: %w", method, path, err)
+			return nil, fmt.Errorf("openworkout: encode %s %s: %w", method, path, err)
 		}
 		payload = bytes.NewReader(raw)
 	}
@@ -150,12 +149,12 @@ func (c *Client) send(ctx context.Context, method, path string, query url.Values
 	}
 	req, err := http.NewRequestWithContext(ctx, method, target, payload)
 	if err != nil {
-		return nil, fmt.Errorf("lifterclub: %w", err)
+		return nil, fmt.Errorf("openworkout: %w", err)
 	}
 	token := c.Token
 	if c.TokenSource != nil {
 		if token, err = c.TokenSource(ctx); err != nil {
-			return nil, fmt.Errorf("lifterclub: token: %w", err)
+			return nil, fmt.Errorf("openworkout: token: %w", err)
 		}
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -175,7 +174,7 @@ func (c *Client) send(ctx context.Context, method, path string, query url.Values
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("lifterclub: %w", err)
+		return nil, fmt.Errorf("openworkout: %w", err)
 	}
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return res, nil

@@ -13,6 +13,9 @@ jobs:
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
       - run: go test ./...
+      - name: The Go client, a module of its own
+        working-directory: clients/go
+        run: go vet ./... && go test ./...
       - run: go run ./cmd/ows validate
       - run: go run ./cmd/ows site dist
   typescript-client:

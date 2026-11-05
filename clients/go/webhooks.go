@@ -1,4 +1,4 @@
-package lifterclub
+package openworkout
 
 import (
 	"context"
@@ -13,7 +13,11 @@ import (
 
 // SignatureHeader carries a delivery's signature: t=<unix seconds>,v1=<hex HMAC-SHA256 of
 // "<t>.<body>" with the subscription's secret>.
-const SignatureHeader = "Lifterclub-Signature"
+const SignatureHeader = "OWS-Signature"
+
+// LifterclubSignatureHeader is the same signature under its earlier name, which Lifterclub also
+// sends until OWS v1.
+const LifterclubSignatureHeader = "Lifterclub-Signature"
 
 // CreateWebhook subscribes the app to changes in the user's log. The returned Secret is shown
 // once: keep it to verify deliveries. Only a connected app can subscribe, at most 5 per app and

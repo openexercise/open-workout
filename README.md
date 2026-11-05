@@ -2,7 +2,7 @@
 
 An open format for a workout log, and the set of MCP tools an assistant uses to read and write one.
 
-**Status: v0 development draft.** The schema may change until v1, and every change is listed in its changelog. v1 freezes when a second application writes it in production; after that, changes are additive.
+**Status: v0 development draft.** The schema may change until v1, and every change is listed in its changelog. v1 freezes when the first application outside Lifterclub writes it in production; after that, changes are additive.
 
 | | |
 | --- | --- |
@@ -13,9 +13,10 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |
 | `mcp/README.md` | What a server offering those tools keeps to |
 | `examples` | A workout and a program in the format |
-| `api/v1.yaml` | The reference REST API as OpenAPI 3.1, as Lifterclub serves it; workouts refer to `schema/v0/workout.json` |
-| `clients/go` | A thin Go client for that API, standard library only: `github.com/openexercise/open-workout/clients/go` |
-| `clients/ts` | A thin TypeScript client, `lifterclub-client`, generated from `api/v1.yaml` |
+| `api/core.yaml` | The Open Workout API core as OpenAPI 3.1: the routes any Open Workout server serves (workouts, sets and entries, undo, the change feed, export, webhooks, exercise search); workouts refer to `schema/v0/workout.json` |
+| `api/v1.yaml` | Lifterclub's whole API, the reference implementation: the core plus its own extensions |
+| `clients/go` | A thin Go client, package `openworkout`, standard library only: the module `github.com/openexercise/open-workout/clients/go` |
+| `clients/ts` | A thin TypeScript client, `@openexercise/open-workout-client`: the core at its root, Lifterclub's API at `/lifterclub` |
 | `cmd/ows` | `ows validate`, which checks documents against the schemas; `ows conformance`, which checks a server's REST API; and `ows site`, which builds the website |
 | `conformance` | The conformance script as a Go package, for a server's own tests |
 
@@ -66,17 +67,21 @@ go get github.com/openexercise/open-workout/clients/go
 ```
 
 ```bash
-npm install @openexercise/lifterclub-client
+npm install @openexercise/open-workout-client
 ```
 
-`npm run check` in `clients/ts` fails when its generated types no longer match `api/v1.yaml`.
+`npm run check` in `clients/ts` fails when its generated types no longer match `api/core.yaml` and `api/v1.yaml`. Up to 0.3.0 the TypeScript client was `@openexercise/lifterclub-client`; its `/lifterclub` entry replaces that package unchanged.
 
-### Releasing the TypeScript client
+### Releasing the clients
+
+The Go client is a module of its own: tag a merge `clients/go/v<version>` (`git tag clients/go/v0.1.0`) and push the tag, and `go get` finds it.
+
+The TypeScript client:
 
 The package and its version come from Lifterclub, which publishes them here. To release one:
 
 1. Bump `version` in `clients/ts/package.json` there, run its publish script into this repository, and merge.
-2. Tag the merge here and push the tag: `git tag clients-ts-v0.2.0 && git push origin clients-ts-v0.2.0`.
+2. Tag the merge here and push the tag: `git tag clients-ts-v0.4.0 && git push origin clients-ts-v0.4.0`.
 3. The Publish TypeScript client workflow checks the tag against `package.json`, tests, and publishes with provenance, through npm's trusted publishing: no token is stored in this repository.
 
 ## Relationship to other standards
