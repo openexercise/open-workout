@@ -1920,10 +1920,24 @@ components:
                     load: { $ref: "#/components/schemas/ProgramNumber" }
                     explanation: { type: string }
                     needs_start: { type: boolean }
+                    start_key:
+                      type: string
+                      description: "The key in starting_numbers this slot reads, when it reads one: the exercise ID, or, for a lift the program reads more than one way (a heavy and a light tier, say), the exercise ID, @ and the first day that reads it this way, such as oec:barbell-back-squat@a2. Send the number under this key."
                     sets:
                       description: The set scheme to do this time, when the slot's stages rule chooses one.
                       type: array
                       items: { $ref: "../schema/v0/program.json#/$defs/setGroup" }
+                    loads:
+                      description: "Each set group's weight, in the slot's order, when its set groups carry their own percentages of the training max. load is then the heaviest."
+                      type: array
+                      items: { $ref: "#/components/schemas/ProgramNumber" }
+                    of:
+                      description: "The lift whose training max this slot works from, when it isn't the slot's own exercise (a front squat from the back squat's), as done: a swap of that lift moves it to the swap's. Its start_key is that lift's."
+                      type: object
+                      required: [id, name]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
     UndoSuggestionInput:
       type: object
       required: [workout_ids]
@@ -1979,8 +1993,9 @@ components:
         swaps: { type: array, items: { $ref: "#/components/schemas/ProgramSwap" } }
         starting_numbers:
           type: object
+          description: Keyed by each target's start_key.
           additionalProperties: { $ref: "#/components/schemas/ProgramNumber" }
-        start_from_history: { type: boolean, description: Fill in the rest from the last time each exercise was logged. }
+        start_from_history: { type: boolean, description: "Fill in the rest from the last time each exercise was logged. A lift the program reads more than one way is left for the person to enter." }
     ProgramEnrollment:
       type: object
       required: [id, program, listed, started_at, swaps, starting_numbers]

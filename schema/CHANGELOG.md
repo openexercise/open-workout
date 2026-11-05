@@ -6,6 +6,23 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-04: Three more progression shapes in `program.json`, all additive. A `linear` rule may
+  carry `stages`, with `on_fail.stage_after_drops`: the drop that makes that many at one set scheme
+  also moves on to the next (StrongLifts' 5x5 → 3x5 → 3x3). A new load, `percent_of_slot`
+  (`value`, `day`, optional `of`), is a percentage of another slot's current target (Texas Method's
+  volume and recovery days). A `linear` increment may be a percentage (`unit: "%"`) of the load or
+  training max it adds to (Madcow's 2.5% a week). 11 more vectors; a `percent_of_slot` case gives
+  `reference`, the target of the slot it reads.
+- 2026-11-04: Three additions to `program.json` for programs that ramp through percentages of
+  training maxes (nSuns-style): a set group may carry its own `percent` of the training max on a
+  `percent_training_max` slot whose load has no value, so one slot holds a lift's whole ramp; a
+  `percent_training_max` load may name, in `of`, the lift whose training max it works from (a front
+  squat from the back squat's), and such a slot carries no rule; and `increment_table`, or `linear`
+  with success `amrap`, may name in `amrap_set` which planned set it reads, when it isn't the last
+  AMRAP set. Vectors added, with `want.loads` for each group's weight. Additive.
+- 2026-11-04: Missing data holds for every progression rule: a session with reps unknown on a set
+  the rule reads (none missing, none logged short) is neither done nor short, so the load, stage
+  and training max stay. Before, `all_sets` counted such sets as done. Vectors updated and added.
 - 2026-11-04: `linear` and `increment_table` may go on a `percent_training_max` slot, where they
   move the lift's training max: replayed from the person's training max through the sessions
   logged on the slots carrying a rule, with `on_fail` taking its drop off the training max. Covers
