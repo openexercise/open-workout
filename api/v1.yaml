@@ -57,14 +57,15 @@ paths:
   /v1/workouts:
     get:
       operationId: listWorkouts
+      x-ows: core
       summary: List workouts, newest first
       description: Totals cover the workouts on this page.
       tags: [Workouts]
       security: [{ oauth2: [workouts:read] }]
       parameters:
-        - { name: from, in: query, description: First day, YYYY-MM-DD in the user's timezone. Default 30 days before `to`., schema: { type: string, format: date } }
-        - { name: to, in: query, description: Last day, inclusive. Default today., schema: { type: string, format: date } }
-        - { name: exercise, in: query, description: Only workouts with this exercise (name or ID), showing just its entries., schema: { type: string } }
+        - { name: from, in: query, description: "First day, YYYY-MM-DD in the user's timezone. Default 30 days before `to`.", schema: { type: string, format: date } }
+        - { name: to, in: query, description: "Last day, inclusive. Default today.", schema: { type: string, format: date } }
+        - { name: exercise, in: query, description: "Only workouts with this exercise (name or ID), showing just its entries.", schema: { type: string } }
         - { name: limit, in: query, description: Workouts per page., schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
         - { name: cursor, in: query, description: "`next_cursor` from the previous page.", schema: { type: string } }
         - { name: updated_since, in: query, description: "The change feed: every workout whose stored record changed at or after this time, oldest change first, ignoring `from`, `to` and `exercise`. For mirroring a log; see `include_deleted`.", schema: { type: string, format: date-time } }
@@ -82,6 +83,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     post:
       operationId: createWorkout
+      x-ows: core
       summary: Log a workout
       tags: [Workouts]
       security: [{ oauth2: [workouts:write] }]
@@ -130,6 +132,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       operationId: getWorkout
+      x-ows: core
       summary: Get a workout
       tags: [Workouts]
       security: [{ oauth2: [workouts:read] }]
@@ -145,6 +148,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     patch:
       operationId: updateWorkout
+      x-ows: core
       summary: Change a workout's title, date or notes, or finish it
       tags: [Workouts]
       security: [{ oauth2: [workouts:write] }]
@@ -162,6 +166,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     delete:
       operationId: deleteWorkout
+      x-ows: core
       summary: Delete a workout
       description: Returns an undo token that restores it for 10 minutes.
       tags: [Workouts]
@@ -182,6 +187,7 @@ paths:
         schema: { type: string }
     post:
       operationId: addWorkoutSets
+      x-ows: core
       summary: Add sets for an exercise
       description: Sets for an exercise the workout already has join its entry.
       tags: [Sets and entries]
@@ -208,8 +214,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     patch:
       operationId: updateEntry
+      x-ows: core
       summary: Confirm an entry's exercise, or change its notes
-      description: Setting `exercise_id` resolves `needs_confirmation`, and Lifterclub remembers what the user meant.
+      description: Setting `exercise_id` resolves `needs_confirmation`, and the server may remember what the user meant.
       tags: [Sets and entries]
       security: [{ oauth2: [workouts:write] }]
       requestBody:
@@ -226,6 +233,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     delete:
       operationId: deleteEntry
+      x-ows: core
       summary: Delete an exercise entry with its sets
       tags: [Sets and entries]
       security: [{ oauth2: [workouts:write] }]
@@ -241,6 +249,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: addEntrySets
+      x-ows: core
       summary: Add sets to an exercise entry
       tags: [Sets and entries]
       security: [{ oauth2: [workouts:write] }]
@@ -266,6 +275,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     patch:
       operationId: updateSet
+      x-ows: core
       summary: Change a set
       tags: [Sets and entries]
       security: [{ oauth2: [workouts:write] }]
@@ -283,6 +293,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     delete:
       operationId: deleteSet
+      x-ows: core
       summary: Delete a set
       tags: [Sets and entries]
       security: [{ oauth2: [workouts:write] }]
@@ -296,6 +307,7 @@ paths:
   /v1/undo:
     post:
       operationId: undo
+      x-ows: core
       summary: Restore what a delete removed
       tags: [Sets and entries]
       security: [{ oauth2: [workouts:write] }]
@@ -775,6 +787,7 @@ paths:
   /v1/webhooks:
     get:
       operationId: listWebhooks
+      x-ows: core
       summary: List this app's webhooks on the account
       description: Without secrets. A webhook belongs to the grant the token came from, so each app sees only its own.
       tags: [Webhooks]
@@ -790,6 +803,7 @@ paths:
         "429": { $ref: "#/components/responses/RateLimited" }
     post:
       operationId: createWebhook
+      x-ows: core
       summary: Be told when the log changes
       description: "Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume."
       tags: [Webhooks]
@@ -814,6 +828,7 @@ paths:
   /v1/webhooks/{id}:
     delete:
       operationId: deleteWebhook
+      x-ows: core
       summary: End a webhook
       tags: [Webhooks]
       security: [{ oauth2: [workouts:read] }]
@@ -828,13 +843,16 @@ paths:
   /v1/export:
     get:
       operationId: exportLog
+      x-ows: core
       summary: Download the whole log
       description: |
-        Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts
-        and the routines, plus the profile if the credential has `profile:read`. `csv` has one row per
-        set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run
-        it. Deleted workouts aren't part of the log. Limited to 10 an hour per account. If it fails
-        part way the connection is cut, so an incomplete file never looks finished.
+        Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
+        and a server may add more of the record beside them (Lifterclub adds the routines and program
+        runs, and the profile if the credential has `profile:read`). `csv` has one row per set; free
+        text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it.
+        Deleted workouts aren't part of the log. A server may limit how often it runs (Lifterclub: 10
+        an hour per account). If it fails part way the connection is cut, so an incomplete file never
+        looks finished.
       tags: [Workouts]
       security: [{ oauth2: [workouts:read] }]
       parameters:
@@ -1070,11 +1088,12 @@ paths:
   /v1/exercises:
     get:
       operationId: searchExercises
+      x-ows: core
       summary: Search the catalogue and the user's custom exercises
       tags: [History]
       security: [{ oauth2: [workouts:read] }]
       parameters:
-        - { name: query, in: query, required: true, description: Name or shorthand, e.g. "rdl"., schema: { type: string } }
+        - { name: query, in: query, required: true, description: "Name or shorthand, e.g. \"rdl\".", schema: { type: string } }
         - { name: equipment, in: query, schema: { type: string } }
         - { name: muscle, in: query, schema: { type: string } }
         - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 25, default: 10 } }
@@ -1240,7 +1259,7 @@ paths:
                     required: [url, chunk_size]
                     properties:
                       url: { type: string, format: uri, description: The Cloud Storage resumable upload session. }
-                      chunk_size: { type: integer, description: Bytes per request, a multiple of 256 KiB. }
+                      chunk_size: { type: integer, description: "Bytes per request, a multiple of 256 KiB." }
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1576,7 +1595,7 @@ components:
         display_name: { type: string }
         unit_system: { enum: [metric, imperial] }
         timezone: { type: string }
-        calm_mode: { type: boolean, description: Hide records, totals and progress numbers. }
+        calm_mode: { type: boolean, description: "Hide records, totals and progress numbers." }
         onboarded: { type: boolean, description: The account has finished its setup form. }
         health_consent: { type: boolean, description: Health-data consent is in force; writes need it. }
 
@@ -1590,7 +1609,7 @@ components:
         workouts:
           type: array
           items: { $ref: "#/components/schemas/Workout" }
-        updated_since: { type: string, format: date-time, description: The change feed's start, when listing by `updated_since`. }
+        updated_since: { type: string, format: date-time, description: "The change feed's start, when listing by `updated_since`." }
         deleted:
           type: array
           description: Workouts deleted since `updated_since`, when `include_deleted` was asked for.
@@ -1622,7 +1641,7 @@ components:
         last_delivered_at: { type: string, format: date-time }
         last_status: { type: integer, description: "The endpoint's last HTTP status; 0 when it couldn't be reached." }
         consecutive_failures: { type: integer }
-        secret: { type: string, description: "Only in the creation response: the key the deliveries are signed with. `Lifterclub-Signature` is `t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">`." }
+        secret: { type: string, description: "Only in the creation response: the key the deliveries are signed with. `OWS-Signature` is `t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">`." }
     PartnerList:
       type: object
       required: [partners]
@@ -1652,7 +1671,7 @@ components:
         id: { type: string }
         deleted_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-        merged_into: { type: string, description: The workout it was merged into, when another app's record of the same session absorbed it. }
+        merged_into: { type: string, description: "The workout it was merged into, when another app's record of the same session absorbed it." }
     Totals:
       type: object
       description: Working sets on this page.
@@ -1874,7 +1893,17 @@ components:
               needs_start: { type: boolean, description: Always false for a routine. }
               rule: { $ref: "#/components/schemas/RoutineRule" }
               is_default: { type: boolean, description: The rule is the default for the row's shape. }
+    OWSExport:
+      type: object
+      description: The log as the Open Workout core promises it. A server may add more of the person's record beside the workouts.
+      required: [exported_at, workouts]
+      properties:
+        exported_at: { type: string, format: date-time }
+        workouts:
+          type: array
+          items: { $ref: "#/components/schemas/Workout" }
     LogExport:
+      x-ows-core-as: OWSExport
       type: object
       required: [exported_at, routines, program_enrollments, program_suggestions_dismissed, workouts]
       properties:
@@ -2310,13 +2339,13 @@ components:
         total: { type: integer, description: Workouts with sets in the file. }
         processed: { type: integer }
         imported: { type: integer }
-        skipped: { type: integer, description: Imported from this app before, so left alone. }
+        skipped: { type: integer, description: "Imported from this app before, so left alone." }
         merged:
           type: integer
           description: |
             The same session as another app's import (same activity, overlapping by 80% or more),
             merged with it: the fuller record shows, with both sources (FR-8.4).
-        dropped_sets: { type: integer, description: Sets outside logging's limits, not stored. }
+        dropped_sets: { type: integer, description: "Sets outside logging's limits, not stored." }
     ImportPreview:
       type: object
       description: What the import would bring in (FR-8.1).
@@ -2327,7 +2356,7 @@ components:
         first_day: { $ref: "#/components/schemas/Date" }
         last_day: { $ref: "#/components/schemas/Date" }
         already_imported: { type: integer, description: Workouts imported from this app before; they're skipped. }
-        already_deleted: { type: integer, description: Of those, ones the user deleted; they stay deleted. }
+        already_deleted: { type: integer, description: "Of those, ones the user deleted; they stay deleted." }
         merges:
           type: integer
           description: Activities another app already imported; they're merged with that record, keeping the fuller one.
@@ -2408,16 +2437,16 @@ components:
         rpe: { type: number, minimum: 1, maximum: 10 }
         duration_s: { type: integer, minimum: 0 }
         distance_m: { type: number, minimum: 0 }
-        calories: { type: integer, minimum: 0, maximum: 20000, description: Kilocalories, only as a machine, watch or app reported them. }
-        heart_rate_bpm: { type: integer, minimum: 0, maximum: 300, description: Average heart rate over the set, only as a watch or app reported it. }
+        calories: { type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them." }
+        heart_rate_bpm: { type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it." }
         warmup: { type: boolean, description: Warm-ups don't count toward records. }
-        estimated: { type: boolean, description: The values were inferred (e.g. read from a photo), not stated. }
+        estimated: { type: boolean, description: "The values were inferred (e.g. read from a photo), not stated." }
     ExerciseInput:
       type: object
       required: [sets]
       properties:
         name: { type: string, description: The exercise as the user named it. }
-        exercise_id: { type: string, description: A catalogue or custom ID, when known; skips matching. }
+        exercise_id: { type: string, description: "A catalogue or custom ID, when known; skips matching." }
         sets:
           type: array
           minItems: 1
@@ -2429,7 +2458,7 @@ components:
       required: [exercises]
       properties:
         started_at: { type: string, format: date-time }
-        date: { $ref: "#/components/schemas/Date", description: Day in the user's timezone, when started_at is not given. Default today. }
+        date: { $ref: "#/components/schemas/Date", description: "Day in the user's timezone, when started_at is not given. Default today." }
         title: { type: string }
         notes: { type: string }
         exercises:
@@ -2505,10 +2534,10 @@ components:
       properties:
         display_name: { type: string }
         units: { $ref: "#/components/schemas/Unit" }
-        timezone: { type: string, description: IANA name, e.g. America/New_York. }
+        timezone: { type: string, description: "IANA name, e.g. America/New_York." }
         program_counts: { type: boolean }
         program_suggestions: { type: boolean }
-        calm_mode: { type: boolean, description: Hide records, totals and progress numbers. }
+        calm_mode: { type: boolean, description: "Hide records, totals and progress numbers." }
         goals: { type: string }
         equipment: { type: array, items: { type: string } }
         limitations: { type: string }

@@ -1,4 +1,4 @@
-package lifterclub
+package openworkout
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 )
 
 // Records is the user's current personal records, for one exercise (name or ID) or all.
+// Lifterclub extension.
 func (c *Client) Records(ctx context.Context, exercise string) (*RecordList, error) {
 	q := url.Values{}
 	setIf(q, "exercise", exercise)
@@ -26,7 +27,7 @@ type ProgressOptions struct {
 	From, To Date
 }
 
-// Progress is one point per session for the metric.
+// Progress is one point per session for the metric. Lifterclub extension.
 func (c *Client) Progress(ctx context.Context, opts ProgressOptions) (*Progress, error) {
 	q := url.Values{"exercise": {opts.Exercise}, "metric": {opts.Metric}}
 	setIf(q, "from", opts.From)
@@ -60,26 +61,26 @@ func (c *Client) SearchExercises(ctx context.Context, opts SearchOptions) ([]Exe
 }
 
 // CreateExercise makes one of the user's own exercises, or returns their existing one by that
-// name.
+// name. Lifterclub extension.
 func (c *Client) CreateExercise(ctx context.Context, in ExerciseRequest) (*ExerciseMatch, error) {
 	var out ExerciseMatch
 	return &out, c.Do(ctx, http.MethodPost, "/v1/exercises", nil, in, &out)
 }
 
-// LastSets is what the user did the last time they did the exercise.
+// LastSets is what the user did the last time they did the exercise. Lifterclub extension.
 func (c *Client) LastSets(ctx context.Context, exerciseID string) (*LastSets, error) {
 	var out LastSets
 	return &out, c.Do(ctx, http.MethodGet, "/v1/exercises/"+pathID(exerciseID)+"/last-sets", nil, nil, &out)
 }
 
-// Profile is the user's training profile (profile:read).
+// Profile is the user's training profile (profile:read). Lifterclub extension.
 func (c *Client) Profile(ctx context.Context) (*Profile, error) {
 	var out Profile
 	return &out, c.Do(ctx, http.MethodGet, "/v1/profile", nil, nil, &out)
 }
 
 // UpdateProfile changes the fields given (profile:write). Goals, equipment, limitations and
-// training days need the user's health-data consent.
+// training days need the user's health-data consent. Lifterclub extension.
 func (c *Client) UpdateProfile(ctx context.Context, patch ProfilePatch) (*Profile, error) {
 	var out Profile
 	return &out, c.Do(ctx, http.MethodPatch, "/v1/profile", nil, patch, &out)

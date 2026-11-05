@@ -13,7 +13,7 @@ Write to the maintainers at maintainers@openexercise.org, or open an issue. Some
 ## How decisions are made
 
 - **Changes** start as an issue or proposal here ([CONTRIBUTING.md](CONTRIBUTING.md)), and a maintainer decides after at least a week for comment. Each lands with a changelog entry in `schema/CHANGELOG.md`.
-- **Versions:** v0 is a development draft, so breaking changes can still land. v1 freezes when a second application writes OWS in production; after it, changes are additive, and a breaking one needs a new major version through a written proposal (an RFC process set up at that point).
+- **Versions:** v0 is a development draft, so breaking changes can still land. v1 freezes when the first application outside Lifterclub writes OWS in production; after it, changes are additive, and a breaking one needs a new major version through a written proposal (an RFC process set up at that point).
 
 Maintainers aim for agreement in the issue. When there isn't any, the lead maintainer decides and says why in the issue.
 

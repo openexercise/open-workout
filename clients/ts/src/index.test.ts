@@ -2,7 +2,8 @@ import { createHmac } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { ApiError, changes, createLifterclubClient, retryAfter, unwrap, verifySignature, workouts } from './index.js'
+import * as core from './index.js'
+import { ApiError, changes, createLifterclubClient, retryAfter, unwrap, verifySignature, workouts } from './lifterclub.js'
 
 type Handler = (request: Request) => Response | Promise<Response>
 
@@ -145,5 +146,40 @@ describe('verifySignature', () => {
     expect(await verifySignature('other', sign(t), body, now)).toBe(false)
     expect(await verifySignature(secret, sign(t - 301), body, now)).toBe(false)
     expect(await verifySignature(secret, null, body, now)).toBe(false)
+  })
+})
+
+describe('createOpenWorkoutClient', () => {
+  it('calls the server it is given, with the token and an Idempotency-Key', async () => {
+    const requests: Request[] = []
+    const api = core.createOpenWorkoutClient({
+      baseUrl: 'https://ows.example/',
+      token: 'tok',
+      idempotencyKey: () => 'key-2',
+      fetch: async (request) => {
+        requests.push(request)
+        return json({ id: 'w1', summary: 'Logged.', needs_confirmation: [], new_records: [] }, 201)
+      },
+    })
+    await api.POST('/v1/workouts', { body: { exercises: [{ name: 'Bench Press', sets: [{ reps: 5 }] }] } })
+    expect(requests[0]?.url).toBe('https://ows.example/v1/workouts')
+    expect(requests[0]?.headers.get('Authorization')).toBe('Bearer tok')
+    expect(requests[0]?.headers.get('Idempotency-Key')).toBe('key-2')
+  })
+
+  it('pages through workouts like the Lifterclub client', async () => {
+    const pages = [
+      { workouts: [{ id: 'a' }], truncated: true, next_cursor: 'c1' },
+      { workouts: [{ id: 'b' }], truncated: false },
+    ]
+    const api = core.createOpenWorkoutClient({ baseUrl: 'https://ows.example', token: 't', fetch: async () => json(pages.shift()) })
+    const ids: string[] = []
+    for await (const w of core.workouts(api)) ids.push((w as { id: string }).id)
+    expect(ids).toEqual(['a', 'b'])
+  })
+
+  it('names the signature header the core uses, and the earlier one', () => {
+    expect(core.signatureHeader).toBe('OWS-Signature')
+    expect(core.lifterclubSignatureHeader).toBe('Lifterclub-Signature')
   })
 })

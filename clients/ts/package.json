@@ -1,7 +1,7 @@
 {
-  "name": "@openexercise/lifterclub-client",
-  "version": "0.3.0",
-  "description": "A thin TypeScript client for the Lifterclub API, generated from its OpenAPI document.",
+  "name": "@openexercise/open-workout-client",
+  "version": "0.4.0",
+  "description": "A thin TypeScript client for any Open Workout server, generated from the Open Workout API core, with Lifterclub's full API as a subpath.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -11,8 +11,10 @@
   "homepage": "https://github.com/openexercise/open-workout/tree/main/clients/ts#readme",
   "bugs": "https://github.com/openexercise/open-workout/issues",
   "keywords": [
-    "lifterclub",
+    "open-workout",
     "open-workout-schema",
+    "open-exercise",
+    "lifterclub",
     "workout",
     "fitness",
     "openapi"
@@ -24,6 +26,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./lifterclub": {
+      "types": "./dist/lifterclub.d.ts",
+      "import": "./dist/lifterclub.js"
     }
   },
   "files": [
@@ -33,10 +39,10 @@
   ],
   "scripts": {
     "gen": "node scripts/gen.mjs",
-    "check": "node scripts/gen.mjs && git diff --exit-code -- src/v1.d.ts",
+    "check": "node scripts/gen.mjs && git diff --exit-code -- src/core.d.ts src/lifterclub-api.d.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "tsc -p tsconfig.build.json && cp src/v1.d.ts dist/",
+    "build": "tsc -p tsconfig.build.json && cp src/core.d.ts src/lifterclub-api.d.ts dist/",
     "prepack": "npm run build"
   },
   "dependencies": {

@@ -1,0 +1,776 @@
+# The Open Workout API core: what any Open Workout server serves. Generated from Lifterclub's
+# docs/openapi/v1.yaml, the reference implementation, by make ows-core: don't edit it by hand.
+openapi: 3.1.0
+info:
+  title: Open Workout API core
+  version: v0
+  summary: The routes any Open Workout server serves over a person's workout log.
+  description: |
+    The REST API any Open Workout server serves over a person's workout log. Workouts are Open
+    Workout Schema v0 documents (https://openworkout.dev/schema/v0/workout.json) whose exercises are
+    Open Exercise IDs (https://openexercise.org).
+
+    A server is found from a 401: its WWW-Authenticate header names the OAuth protected resource
+    metadata (RFC 9728), which names the authorization server (RFC 8414). Clients use OAuth 2.1 with
+    PKCE. Errors are RFC 9457 problem details whose code says what went wrong. Requests that create
+    things take an Idempotency-Key header, and a retry with the same key returns the first result with
+    Idempotent-Replayed: true. Webhook deliveries are signed in OWS-Signature.
+
+    A server may add routes, fields and limits of its own; clients ignore what they don't know.
+    ows conformance <base-url> checks a server against this document's behaviour.
+    Lifterclub (https://api.lifterclub.com) is the reference implementation.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+security:
+  - oauth2: []
+tags:
+  - name: Workouts
+  - name: Webhooks
+  - name: Sets and entries
+  - name: History
+paths:
+  /v1/workouts:
+    get:
+      operationId: listWorkouts
+      summary: List workouts, newest first
+      description: Totals cover the workouts on this page.
+      tags: [Workouts]
+      security: [{oauth2: ['workouts:read']}]
+      parameters:
+        - {name: from, in: query, description: "First day, YYYY-MM-DD in the user's timezone. Default 30 days before `to`.", schema: {type: string, format: date}}
+        - {name: to, in: query, description: "Last day, inclusive. Default today.", schema: {type: string, format: date}}
+        - {name: exercise, in: query, description: "Only workouts with this exercise (name or ID), showing just its entries.", schema: {type: string}}
+        - {name: limit, in: query, description: Workouts per page., schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: cursor, in: query, description: "`next_cursor` from the previous page.", schema: {type: string}}
+        - {name: updated_since, in: query, description: "The change feed: every workout whose stored record changed at or after this time, oldest change first, ignoring `from`, `to` and `exercise`. For mirroring a log; see `include_deleted`.", schema: {type: string, format: date-time}}
+        - {name: include_deleted, in: query, description: "With `updated_since`, also list the workouts deleted since then, as tombstones in `deleted`.", schema: {type: boolean, default: false}}
+      responses:
+        "200":
+          description: A page of workouts.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WorkoutList"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    post:
+      operationId: createWorkout
+      summary: Log a workout
+      tags: [Workouts]
+      security: [{oauth2: ['workouts:write']}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WorkoutInput"}
+      responses:
+        "201": {$ref: "#/components/responses/Created"}
+        "200": {$ref: "#/components/responses/Replayed"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/NotFound", description: "A workout with this `external_id` was deleted here and stays deleted."}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/workouts/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getWorkout
+      summary: Get a workout
+      tags: [Workouts]
+      security: [{oauth2: ['workouts:read']}]
+      responses:
+        "200":
+          description: The workout.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Workout"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    patch:
+      operationId: updateWorkout
+      summary: Change a workout's title, date or notes, or finish it
+      tags: [Workouts]
+      security: [{oauth2: ['workouts:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WorkoutPatch"}
+      responses:
+        "200": {$ref: "#/components/responses/Written"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    delete:
+      operationId: deleteWorkout
+      summary: Delete a workout
+      description: Returns an undo token that restores it for 10 minutes.
+      tags: [Workouts]
+      security: [{oauth2: ['workouts:write']}]
+      responses:
+        "200": {$ref: "#/components/responses/Deleted"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/workouts/{id}/sets:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: A workout ID, or `current` for the session in progress (started if there is none in the last 4 hours).
+        schema: {type: string}
+    post:
+      operationId: addWorkoutSets
+      summary: Add sets for an exercise
+      description: Sets for an exercise the workout already has join its entry.
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/AddSetsRequest"}
+      responses:
+        "201": {$ref: "#/components/responses/Written"}
+        "200": {$ref: "#/components/responses/Replayed"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/entries/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    patch:
+      operationId: updateEntry
+      summary: Confirm an entry's exercise, or change its notes
+      description: Setting `exercise_id` resolves `needs_confirmation`, and the server may remember what the user meant.
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EntryPatch"}
+      responses:
+        "200": {$ref: "#/components/responses/Written"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    delete:
+      operationId: deleteEntry
+      summary: Delete an exercise entry with its sets
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      responses:
+        "200": {$ref: "#/components/responses/Deleted"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/entries/{id}/sets:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: addEntrySets
+      summary: Add sets to an exercise entry
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/EntrySetsRequest"}
+      responses:
+        "201": {$ref: "#/components/responses/Written"}
+        "200": {$ref: "#/components/responses/Replayed"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/sets/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    patch:
+      operationId: updateSet
+      summary: Change a set
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SetPatch"}
+      responses:
+        "200": {$ref: "#/components/responses/Written"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    delete:
+      operationId: deleteSet
+      summary: Delete a set
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      responses:
+        "200": {$ref: "#/components/responses/Deleted"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/undo:
+    post:
+      operationId: undo
+      summary: Restore what a delete removed
+      tags: [Sets and entries]
+      security: [{oauth2: ['workouts:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/UndoRequest"}
+      responses:
+        "200": {$ref: "#/components/responses/Written"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "410":
+          description: The undo token is unknown, already used or expired.
+          content:
+            application/problem+json:
+              schema: {$ref: "#/components/schemas/Problem"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List this app's webhooks on the account
+      description: Without secrets. A webhook belongs to the grant the token came from, so each app sees only its own.
+      tags: [Webhooks]
+      security: [{oauth2: ['workouts:read']}]
+      responses:
+        "200":
+          description: The app's subscriptions.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/WebhookList"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    post:
+      operationId: createWebhook
+      summary: Be told when the log changes
+      description: "Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume."
+      tags: [Webhooks]
+      security: [{oauth2: ['workouts:read']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/WebhookInput"}
+      responses:
+        "201":
+          description: Subscribed. `Location` names the subscription.
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Webhook"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/webhooks/{id}:
+    delete:
+      operationId: deleteWebhook
+      summary: End a webhook
+      tags: [Webhooks]
+      security: [{oauth2: ['workouts:read']}]
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "204": {description: Deleted.}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/export:
+    get:
+      operationId: exportLog
+      summary: Download the whole log
+      description: |
+        Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
+        and a server may add more of the record beside them (Lifterclub adds the routines and program
+        runs, and the profile if the credential has `profile:read`). `csv` has one row per set; free
+        text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it.
+        Deleted workouts aren't part of the log. A server may limit how often it runs (Lifterclub: 10
+        an hour per account). If it fails part way the connection is cut, so an incomplete file never
+        looks finished.
+      tags: [Workouts]
+      security: [{oauth2: ['workouts:read']}]
+      parameters:
+        - {name: format, in: query, schema: {type: string, enum: [json, csv], default: json}}
+      responses:
+        "200":
+          description: The file, sent as an attachment.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/OWSExport"}
+            text/csv:
+              schema: {type: string}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/exercises:
+    get:
+      operationId: searchExercises
+      summary: Search the catalogue and the user's custom exercises
+      tags: [History]
+      security: [{oauth2: ['workouts:read']}]
+      parameters:
+        - {name: query, in: query, required: true, description: "Name or shorthand, e.g. \"rdl\".", schema: {type: string}}
+        - {name: equipment, in: query, schema: {type: string}}
+        - {name: muscle, in: query, schema: {type: string}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 25, default: 10}}
+      responses:
+        "200":
+          description: Best matches first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [exercises]
+                properties:
+                  exercises:
+                    type: array
+                    items: {$ref: "#/components/schemas/ExerciseMatch"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+components:
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Any unique string, up to 200 characters. Retrying with the same key never writes twice.
+      schema: {type: string, maxLength: 200}
+  headers:
+    Location:
+      description: The workout's URL.
+      schema: {type: string}
+    IdempotentReplayed:
+      description: "`true` when the response replays an earlier request with the same Idempotency-Key."
+      schema: {type: string, enum: ["true"]}
+    RetryAfter:
+      description: Seconds to wait.
+      schema: {type: integer}
+  responses:
+    Created:
+      description: Stored.
+      headers:
+        Location: {$ref: "#/components/headers/Location"}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Logged"}
+    Replayed:
+      description: An earlier request with the same Idempotency-Key; nothing new was stored.
+      headers:
+        Idempotent-Replayed: {$ref: "#/components/headers/IdempotentReplayed"}
+        Location: {$ref: "#/components/headers/Location"}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Logged"}
+    Written:
+      description: The workout after the change.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Logged"}
+    Deleted:
+      description: Deleted, with an undo token.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Deleted"}
+    BadRequest:
+      description: "`invalid_input`: `field` names what to fix."
+      content:
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+    Unauthorized:
+      description: Missing, invalid or expired token, or the account no longer exists.
+      headers:
+        WWW-Authenticate:
+          description: Points at the protected resource metadata.
+          schema: {type: string}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/BearerError"}
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+    Forbidden:
+      description: |
+        The token lacks the scope (a bearer error), or the user hasn't given health-data consent
+        (`consent_required`).
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/BearerError"}
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+    NotFound:
+      description: "`not_found`: no such resource in this account."
+      content:
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+    Unprocessable:
+      description: "`nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      content:
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+    RateLimited:
+      description: "`rate_limited`."
+      headers:
+        Retry-After: {$ref: "#/components/headers/RetryAfter"}
+      content:
+        application/problem+json:
+          schema: {$ref: "#/components/schemas/Problem"}
+  schemas:
+    Workout:
+      # Relative, so the spec works offline and in code generators; published alongside it.
+      $ref: "../schema/v0/workout.json"
+    MatchStatus:
+      description: catalogue and custom are confirmed; close and unmatched need confirmation.
+      enum: [catalogue, close, custom, unmatched]
+    Unit:
+      enum: [kg, lb]
+    Date:
+      type: string
+      format: date
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: {type: string, format: uri}
+        title: {type: string}
+        status: {type: integer}
+        detail: {type: string}
+        code:
+          enum: [invalid_input, consent_required, nothing_to_log, parse_unsure, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
+        field: {type: string, description: For invalid_input.}
+        candidates:
+          type: array
+          description: For exercise_ambiguous.
+          items: {$ref: "#/components/schemas/Candidate"}
+        warnings:
+          type: array
+          description: For nothing_to_log and parse_unsure.
+          items: {$ref: "#/components/schemas/Warning"}
+    BearerError:
+      type: object
+      required: [error]
+      properties:
+        error: {enum: [invalid_request, invalid_token, insufficient_scope, server_error]}
+        error_description: {type: string}
+    WorkoutList:
+      type: object
+      required: [workouts, totals, truncated, summary]
+      properties:
+        from: {$ref: "#/components/schemas/Date", description: First day listed; absent in the change feed.}
+        to: {$ref: "#/components/schemas/Date", description: Last day listed; absent in the change feed.}
+        exercise: {type: string, description: The exercise filter's name.}
+        workouts:
+          type: array
+          items: {$ref: "#/components/schemas/Workout"}
+        updated_since: {type: string, format: date-time, description: "The change feed's start, when listing by `updated_since`."}
+        deleted:
+          type: array
+          description: Workouts deleted since `updated_since`, when `include_deleted` was asked for.
+          items: {$ref: "#/components/schemas/Tombstone"}
+        totals: {$ref: "#/components/schemas/Totals"}
+        truncated: {type: boolean, description: More workouts follow; pass next_cursor.}
+        next_cursor: {type: string}
+        summary: {type: string}
+    WebhookInput:
+      type: object
+      required: [url, events]
+      properties:
+        url: {type: string, maxLength: 2048, description: "An https URL on a public host, with no credentials. Checked again on every delivery, on the address actually reached."}
+        events:
+          type: array
+          minItems: 1
+          items: {type: string, enum: [workout.created, workout.updated, workout.deleted]}
+    Webhook:
+      type: object
+      required: [id, url, events, created_at, consecutive_failures]
+      properties:
+        id: {type: string}
+        url: {type: string}
+        events:
+          type: array
+          items: {type: string, enum: [workout.created, workout.updated, workout.deleted]}
+        created_at: {type: string, format: date-time}
+        paused_at: {type: string, format: date-time, description: Set after ten failed deliveries in a row. Nothing is delivered until the app subscribes again.}
+        last_delivered_at: {type: string, format: date-time}
+        last_status: {type: integer, description: "The endpoint's last HTTP status; 0 when it couldn't be reached."}
+        consecutive_failures: {type: integer}
+        secret: {type: string, description: "Only in the creation response: the key the deliveries are signed with. `OWS-Signature` is `t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">`."}
+    WebhookList:
+      type: object
+      required: [webhooks]
+      properties:
+        webhooks:
+          type: array
+          items: {$ref: "#/components/schemas/Webhook"}
+    Tombstone:
+      type: object
+      description: A deleted workout in the change feed, enough to remove a mirror's copy and nothing of what it held.
+      required: [id, deleted_at, updated_at]
+      properties:
+        id: {type: string}
+        deleted_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        merged_into: {type: string, description: "The workout it was merged into, when another app's record of the same session absorbed it."}
+    Totals:
+      type: object
+      description: Working sets on this page.
+      required: [workouts, sets, volume, unit]
+      properties:
+        workouts: {type: integer}
+        sets: {type: integer}
+        volume: {type: number, description: Sum of load × reps.}
+        unit: {$ref: "#/components/schemas/Unit"}
+    Logged:
+      type: object
+      description: The result of a write.
+      required: [workout, summary, new_records, needs_confirmation]
+      properties:
+        workout: {$ref: "#/components/schemas/Workout"}
+        summary: {type: string, description: One line to show the user.}
+        new_records:
+          type: array
+          items: {$ref: "#/components/schemas/Record"}
+        needs_confirmation:
+          type: array
+          items: {$ref: "#/components/schemas/Confirmation"}
+        replayed: {type: boolean}
+        parse_method: {type: string, description: "How text was read, for a write made from text: llm or fallback."}
+        warnings:
+          type: array
+          description: For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out.
+          items: {$ref: "#/components/schemas/Warning"}
+    Record:
+      type: object
+      description: A personal record the write changed.
+      required: [exercise_id, exercise_name, kind, value, unit, set_id]
+      properties:
+        exercise_id: {type: string}
+        exercise_name: {type: string}
+        kind: {$ref: "#/components/schemas/RecordKind"}
+        value: {type: number}
+        unit: {$ref: "#/components/schemas/Unit"}
+        previous: {type: number, description: Absent for a first record.}
+        set_id: {type: string, format: uuid}
+        removed: {type: boolean, description: No set qualifies any more; value is 0.}
+    RecordKind:
+      enum: [heaviest_load, best_e1rm, best_set_volume]
+    Confirmation:
+      type: object
+      description: An exercise to confirm with the user, then fix with PATCH /v1/entries/{entry_id}.
+      required: [entry_id, text, status, candidates]
+      properties:
+        entry_id: {type: string, format: uuid}
+        text: {type: string}
+        status: {$ref: "#/components/schemas/MatchStatus"}
+        candidates:
+          type: array
+          items: {$ref: "#/components/schemas/Candidate"}
+    Candidate:
+      type: object
+      required: [id, name, measurement_type, is_custom, score]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        measurement_type: {$ref: "#/components/schemas/MeasurementType"}
+        is_custom: {type: boolean}
+        score: {type: number}
+    MeasurementType:
+      enum: [weight_reps, reps, duration, distance_duration, assisted_weight_reps]
+    Deleted:
+      type: object
+      required: [kind, id, undo_token, undo_expires_at, records_changed, summary]
+      properties:
+        kind: {enum: [workout, exercise, set]}
+        id: {type: string, format: uuid}
+        undo_token: {type: string}
+        undo_expires_at: {type: string, format: date-time}
+        records_changed:
+          type: array
+          items: {$ref: "#/components/schemas/Record"}
+        summary: {type: string}
+    OWSExport:
+      type: object
+      description: The log as the Open Workout core promises it. A server may add more of the person's record beside the workouts.
+      required: [exported_at, workouts]
+      properties:
+        exported_at: {type: string, format: date-time}
+        workouts:
+          type: array
+          items: {$ref: "#/components/schemas/Workout"}
+    ProgramRef:
+      type: object
+      required: [id]
+      properties:
+        id: {type: string}
+        version: {type: integer}
+        day: {type: string}
+    Warning:
+      type: object
+      required: [code]
+      properties:
+        code: {enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited]}
+        detail: {type: string}
+    ExerciseMatch:
+      type: object
+      required: [id, name, measurement_type, equipment, primary_muscles, is_custom, score]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        measurement_type: {$ref: "#/components/schemas/MeasurementType"}
+        equipment: {type: array, items: {type: string}}
+        primary_muscles: {type: array, items: {type: string}}
+        is_custom: {type: boolean}
+        score: {type: number}
+    SetInput:
+      type: object
+      properties:
+        reps: {type: integer, minimum: 0, maximum: 1000}
+        load: {type: number, minimum: 0, description: Leave out for bodyweight.}
+        unit: {$ref: "#/components/schemas/Unit", description: Leave out for the user's unit.}
+        rpe: {type: number, minimum: 1, maximum: 10}
+        duration_s: {type: integer, minimum: 0}
+        distance_m: {type: number, minimum: 0}
+        calories: {type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them."}
+        heart_rate_bpm: {type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it."}
+        warmup: {type: boolean, description: Warm-ups don't count toward records.}
+        estimated: {type: boolean, description: "The values were inferred (e.g. read from a photo), not stated."}
+    ExerciseInput:
+      type: object
+      required: [sets]
+      properties:
+        name: {type: string, description: The exercise as the user named it.}
+        exercise_id: {type: string, description: "A catalogue or custom ID, when known; skips matching."}
+        sets:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items: {$ref: "#/components/schemas/SetInput"}
+        notes: {type: string}
+    WorkoutInput:
+      type: object
+      required: [exercises]
+      properties:
+        started_at: {type: string, format: date-time}
+        date: {$ref: "#/components/schemas/Date", description: "Day in the user's timezone, when started_at is not given. Default today."}
+        title: {type: string}
+        notes: {type: string}
+        exercises:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: {$ref: "#/components/schemas/ExerciseInput"}
+        program: {$ref: "#/components/schemas/ProgramRef"}
+        external_id: {type: string, maxLength: 200, description: "Your app's own ID for this workout. A second POST with the same ID replays the first (200, `Idempotent-Replayed: true`) instead of logging twice; one the person has since deleted here answers 404 and stays deleted. Not for the web app."}
+    WorkoutPatch:
+      type: object
+      minProperties: 1
+      properties:
+        title: {type: string}
+        date: {$ref: "#/components/schemas/Date", description: Move the workout to this day.}
+        ended_at:
+          type: string
+          format: date-time
+          description: Finish the workout (a live session). Not before it started, nor in the future; POST /v1/workouts/current/sets then starts a new one.
+        notes: {type: string}
+    AddSetsRequest:
+      type: object
+      required: [sets]
+      properties:
+        exercise: {type: string, description: As the user named it.}
+        exercise_id: {type: string}
+        sets:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/SetInput"}
+    EntrySetsRequest:
+      type: object
+      required: [sets]
+      properties:
+        sets:
+          type: array
+          minItems: 1
+          items: {$ref: "#/components/schemas/SetInput"}
+    EntryPatch:
+      type: object
+      minProperties: 1
+      properties:
+        exercise_id: {type: string, description: From needs_confirmation candidates or /v1/exercises.}
+        notes: {type: string}
+    SetPatch:
+      type: object
+      minProperties: 1
+      properties:
+        reps: {type: integer, minimum: 0}
+        load: {type: number, minimum: 0}
+        unit: {$ref: "#/components/schemas/Unit"}
+        remove_load: {type: boolean, description: Make it bodyweight.}
+        rpe: {type: number, minimum: 1, maximum: 10}
+        duration_s: {type: integer, minimum: 0}
+        distance_m: {type: number, minimum: 0}
+        calories: {type: integer, minimum: 0, maximum: 20000}
+        heart_rate_bpm: {type: integer, minimum: 0, maximum: 300}
+        warmup: {type: boolean}
+    UndoRequest:
+      type: object
+      required: [undo_token]
+      properties:
+        undo_token: {type: string}
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth 2.1 with PKCE (S256), at the server's own authorization server: find it from a 401
+        (RFC 9728, then RFC 8414). Request tokens for the server's resource (RFC 8707).
+      flows:
+        authorizationCode:
+          authorizationUrl: /oauth/authorize
+          tokenUrl: /oauth/token
+          refreshUrl: /oauth/token
+          scopes:
+            workouts:read: See workouts, progress and personal records
+            workouts:write: Add, change and delete workouts

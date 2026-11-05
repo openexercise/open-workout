@@ -6,6 +6,13 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-04: The Open Workout API core, `api/core.yaml`: the routes any OWS server serves
+  (workouts, sets and entries, undo, the change feed, export, webhooks and exercise search),
+  generated from Lifterclub's document, which stays the reference implementation with its own
+  extensions. Webhook headers gain neutral names, `OWS-Signature`, `OWS-Event` and `OWS-Delivery`;
+  Lifterclub also sends the `Lifterclub-` ones until v1. The TypeScript client is now
+  `@openexercise/open-workout-client` (core at the root, Lifterclub's API at `/lifterclub`), and
+  the Go client is package `openworkout`, a module of its own.
 - 2026-11-04: Three more progression shapes in `program.json`, all additive. A `linear` rule may
   carry `stages`, with `on_fail.stage_after_drops`: the drop that makes that many at one set scheme
   also moves on to the next (StrongLifts' 5x5 → 3x5 → 3x3). A new load, `percent_of_slot`
