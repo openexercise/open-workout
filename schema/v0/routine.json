@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openworkout.dev/schema/v0/routine.json",
+  "title": "Open Workout Schema v0: routine",
+  "description": "A routine: a person's own plan for a session, with targets to train from. Targets are never performed work; a workout records what was done. Draft; may change until v1.",
+  "type": "object",
+  "required": ["name", "exercises"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "const": "https://openworkout.dev/schema/v0/routine.json" },
+    "id": { "type": "string", "description": "Assigned by the server that stores the routine." },
+    "name": { "type": "string" },
+    "notes": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "description": "The program this routine was copied from, when it was copied from a library entry. Absent once that entry is withdrawn.",
+      "type": "object",
+      "required": ["program_id", "program_name", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "program_id": { "type": "string" },
+        "program_name": { "type": "string" },
+        "credit": { "type": ["string", "null"] },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "exercises": { "type": "array", "items": { "$ref": "#/$defs/row" } }
+  },
+  "$defs": {
+    "row": {
+      "description": "One exercise in the routine and its targets, in order. Every target is optional: a plan may name only the exercise.",
+      "type": "object",
+      "required": ["exercise_id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "exercise_id": { "type": "string", "description": "An Open Exercise ID (oec:…), or another namespace's, such as a person's own exercise (usr:…)." },
+        "name": { "type": "string" },
+        "equipment": { "type": "array", "items": { "type": "string" }, "description": "The exercise's equipment, as the server's catalogue lists it." },
+        "sets": { "type": "integer", "minimum": 1 },
+        "reps_min": { "type": "integer", "minimum": 0 },
+        "reps_max": { "type": "integer", "minimum": 0, "description": "With reps_min, a rep range to work within." },
+        "load": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["kg", "lb"] },
+        "duration_s": { "type": "integer", "minimum": 0 },
+        "distance_m": { "type": "number", "minimum": 0 },
+        "rest_seconds": { "type": "integer", "minimum": 0 },
+        "notes": { "type": "string" },
+        "progression": { "$ref": "#/$defs/rule" }
+      }
+    },
+    "rule": {
+      "description": "How the row's next weight is suggested; absent means the server's default for the row's shape. linear adds the increment when every set reaches reps_min; double works up the rep range, then adds it. off makes no suggestion.",
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["linear", "double", "off"] },
+        "increment": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "enum": ["kg", "lb"] }
+          }
+        }
+      }
+    }
+  }
+}

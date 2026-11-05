@@ -8,6 +8,8 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | --- | --- |
 | `schema/v0/workout.json` | The Open Workout Schema (OWS): one workout, its exercise entries and sets, where the record came from, and every inferred value listed by JSON pointer |
 | `schema/v0/program.json` | A training program as a library publishes it |
+| `schema/v0/routine.json` | A person's routine: named rows of an exercise and its targets, never performed work |
+| `schema/v0/log.json` | A whole log as one file: the workouts, routines and deleted workouts, with room for a server's additions |
 | `schema/v0/progression-vectors.json` | Worked cases for the progression rules in `program.json`: a slot and the sessions logged for it, and the target an implementation should work out next |
 | `schema/CHANGELOG.md` | What changed in v0 |
 | `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |

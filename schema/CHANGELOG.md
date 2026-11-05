@@ -6,6 +6,18 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-05: Two new documents. `routine.json` is a person's routine: named rows of an exercise
+  ID and optional targets (sets, a rep range, load, time, distance, rest) with an optional
+  `linear`/`double`/`off` rule; targets, never performed work. `log.json` is a whole log as one
+  file: `exported_at`, `workouts`, and optionally `routines` and `deleted_workouts` (each with
+  `deleted_at` and `merged_into`); a server may add more of the record beside them. The API core's
+  export now returns a log document. Additive.
+- 2026-11-05: `success: total_reps` decides short as well as done. On `linear`, a session is short
+  only when the planned sets' reps add up to less than `reps`, so a set that went further makes up
+  for one under its `reps_min` (5, 4, 6 reaches 15); before, any set under its `reps_min` was short.
+  `increment_table` may take `success: total_reps` with `reps` too: short means under the total,
+  which `on_fail` counts, and a session that reaches it adds its AMRAP band (the r/Fitness Basic
+  Beginner Routine's rule). `stages` is unchanged. Vectors added.
 - 2026-11-04: The Open Workout API core, `api/core.yaml`: the routes any OWS server serves
   (workouts, sets and entries, undo, the change feed, export, webhooks and exercise search),
   generated from Lifterclub's document, which stays the reference implementation with its own

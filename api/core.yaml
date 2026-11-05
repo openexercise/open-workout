@@ -321,10 +321,11 @@ paths:
       summary: Download the whole log
       description: |
         Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
-        and a server may add more of the record beside them (Lifterclub adds the routines and program
-        runs, and the profile if the credential has `profile:read`). `csv` has one row per set; free
-        text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets don't run it.
-        Deleted workouts aren't part of the log. A server may limit how often it runs (Lifterclub: 10
+        and a server may add more of the record beside them (Lifterclub adds the routines, program
+        runs, imports, consent history and the workouts the person deleted, so the file answers an
+        access request in full, and the profile if the credential has `profile:read`). `csv` has one
+        row per set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
+        don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
         an hour per account). If it fails part way the connection is cut, so an incomplete file never
         looks finished.
       tags: [Workouts]
@@ -634,14 +635,8 @@ components:
           items: {$ref: "#/components/schemas/Record"}
         summary: {type: string}
     OWSExport:
-      type: object
-      description: The log as the Open Workout core promises it. A server may add more of the person's record beside the workouts.
-      required: [exported_at, workouts]
-      properties:
-        exported_at: {type: string, format: date-time}
-        workouts:
-          type: array
-          items: {$ref: "#/components/schemas/Workout"}
+      description: The log as the Open Workout core promises it, an OWS v0 log document (https://openworkout.dev/schema/v0/log.json). A server may add more of the person's record beside its keys.
+      $ref: "../schema/v0/log.json"
     ProgramRef:
       type: object
       required: [id]
