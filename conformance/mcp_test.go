@@ -16,7 +16,8 @@ import (
 )
 
 // TestTemplatePasses builds the template server (mcp/template, a module of its own), runs it,
-// and checks it: the template is what other servers copy, so it must pass.
+// and checks its MCP tools and its API core: the template is what other servers copy, so it must
+// pass both.
 func TestTemplatePasses(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and runs the template server")
@@ -60,7 +61,21 @@ func TestTemplatePasses(t *testing.T) {
 		}
 	}
 	if !report.Passed() {
-		t.Fatal("the template should pass")
+		t.Fatal("the template should pass the MCP checks")
+	}
+
+	// Its API core passes the REST script too.
+	rest, err := Run(context.Background(), Config{BaseURL: "http://" + addr, Token: "writer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range rest.Results {
+		if r.Status != Pass {
+			t.Errorf("REST %s %s: %s", r.Status, r.Name, r.Detail)
+		}
+	}
+	if !rest.Passed() {
+		t.Fatal("the template should pass the REST checks")
 	}
 }
 

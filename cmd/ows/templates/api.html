@@ -1,0 +1,37 @@
+{{template "head" .}}
+<h1>{{.API.Title}}</h1>
+<p class="lead">The routes every Open Workout server serves, from <a href="/api/core.yaml">core.yaml</a> (OpenAPI 3.1, version {{.API.Version}}). Check a server against it with <code>ows conformance</code>; the <a href="/quickstarts/">quickstarts</a> show it in use.</p>
+<div class="prose">{{.API.Description}}</div>
+<nav aria-label="Operations"><ul class="links">{{range .API.Tags}}{{range .Operations}}<li><a href="#{{.ID}}"><code>{{.Method}} {{.Path}}</code></a> {{.Summary}}</li>
+{{end}}{{end}}</ul></nav>
+{{range .API.Tags}}
+<h2>{{.Name}}</h2>
+{{range .Operations}}
+<section id="{{.ID}}">
+<h3><code>{{.Method}} {{.Path}}</code></h3>
+<p><strong>{{.Summary}}</strong>{{if .Scopes}} <small>scope: <code>{{.Scopes}}</code></small>{{end}}</p>
+<div class="prose">{{.Description}}</div>
+{{with .Parameters}}<div class="scroll"><table>
+<thead><tr><th>Parameter</th><th>In</th><th>Type</th><th>Meaning</th></tr></thead>
+<tbody>{{range .}}<tr><td><code>{{.Name}}</code>{{if .Required}} <small>required</small>{{end}}</td><td>{{.In}}</td><td>{{.Type}}</td><td>{{.Description}}</td></tr>
+{{end}}</tbody></table></div>{{end}}
+{{with .Body}}<p>Body: {{.}}</p>{{end}}
+<div class="scroll"><table>
+<thead><tr><th>Status</th><th>Meaning</th><th>Body</th></tr></thead>
+<tbody>{{range .Responses}}<tr><td><code>{{.Status}}</code></td><td>{{.Description}}</td><td>{{.Schema}}</td></tr>
+{{end}}</tbody></table></div>
+</section>
+{{end}}{{end}}
+<h2>Schemas</h2>
+{{range .API.Schemas}}
+<section id="schema-{{.Name}}">
+<h3><code>{{.Name}}</code></h3>
+<div class="prose">{{.Description}}</div>
+{{with .Type}}<p>{{.}}</p>{{end}}
+{{with .Properties}}<div class="scroll"><table>
+<thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+<tbody>{{range .}}<tr><td><code>{{.Name}}</code>{{if .Required}} <small>required</small>{{end}}</td><td>{{.Type}}</td><td>{{.Description}}</td></tr>
+{{end}}</tbody></table></div>{{end}}
+</section>
+{{end}}
+{{template "foot" .}}

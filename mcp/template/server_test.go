@@ -333,7 +333,7 @@ func TestPeopleAreKeptApart(t *testing.T) {
 	}
 	s := NewStore(catalogue, "kg", time.UTC)
 	res, _, err := s.Write("ana", "", "x", func(l *personLog) (Result, error) {
-		return l.LogWorkout(LogWorkoutInput{Exercises: []ExerciseInput{{Name: "squat", Sets: []SetInput{{Reps: ptr(5)}}}}}, "")
+		return l.LogWorkout(LogWorkoutInput{Exercises: []ExerciseInput{{Name: "squat", Sets: []SetInput{{Reps: ptr(5)}}}}}, "mcp", "")
 	})
 	if err != nil {
 		t.Fatal(err)

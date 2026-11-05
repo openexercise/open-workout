@@ -23,7 +23,7 @@ h2{font-size:1.3rem;margin:2rem 0 .5rem}h3{font-size:1rem;margin:1.25rem 0 .25re
 @media (max-width:30rem){.fields{grid-template-columns:1fr}.fields dd{margin-bottom:8px}}
 code{background:var(--soft);padding:1px 4px;border-radius:3px;font-size:.9em}
 pre{background:var(--soft);padding:12px;overflow-x:auto;border-radius:6px}pre code{padding:0;background:none}
-table{border-collapse:collapse;width:100%;font-size:.95rem}th,td{border-bottom:1px solid var(--line);padding:6px 10px 6px 0;text-align:left;vertical-align:top}
+table{border-collapse:collapse;width:100%;font-size:.95rem}th,td{border-bottom:1px solid var(--line);padding:6px 10px 6px 0;text-align:left;vertical-align:top}th{white-space:nowrap}
 .scroll{overflow-x:auto}.scroll td code{overflow-wrap:normal}
 .prose{max-width:46rem}.prose table{display:block;overflow-x:auto}
 .notice{background:var(--warn-bg);color:var(--warn-fg);border:1px solid var(--warn-line);padding:10px 12px;border-radius:6px}.notice a{color:inherit}

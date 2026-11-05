@@ -15,7 +15,9 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | `schema/CHANGELOG.md` | What changed in v0 |
 | `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |
 | `mcp/README.md` | What a server offering those tools keeps to |
-| `mcp/template` | A template server to copy: Go, the official MCP SDK, an in-memory store, serving the profile's core tools. Its own module |
+| `mcp/template` | A template server to copy: Go, the official MCP SDK, an in-memory store, serving the MCP profile's core tools and the API core. Its own module |
+| `partner-app` | An example app on the TypeScript client: OAuth with PKCE, logging, the change feed and signed webhooks, tested against the template server |
+| `quickstarts` | TypeScript, Go, an assistant over MCP, and matching exercise names, each runnable against the template server or Lifterclub's sandbox |
 | `examples` | A workout and a program in the format |
 | `api/core.yaml` | The Open Workout API core as OpenAPI 3.1: the routes any Open Workout server serves (workouts, sets and entries, undo, the change feed, export, webhooks, exercise search); workouts refer to `schema/v0/workout.json` |
 | `api/v1.yaml` | Lifterclub's whole API, the reference implementation: the core plus its own extensions |
@@ -38,6 +40,10 @@ go run ./cmd/ows site dist           # the website into dist
 A document names its schema in `$schema`; without one it is checked as a workout.
 
 The site at [openworkout.dev](https://openworkout.dev) is built from this repository by `ows site` and deployed by the Pages workflow on every push to `main`, so the schemas resolve at their `$id` URLs.
+
+## Start building
+
+The [quickstarts](quickstarts/README.md) get an app, an assistant or a server going in a few minutes, against the [template server](mcp/template) on your machine or Lifterclub's sandbox. The API core is rendered at [openworkout.dev/api](https://openworkout.dev/api/).
 
 ## Check a server
 
@@ -113,7 +119,7 @@ A server that passes may say so; it's self-reported, and the checks can't see ev
 | Implementation | What passes | How |
 | --- | --- | --- |
 | [Lifterclub](https://lifterclub.com/developers) (reference) | REST, MCP, vectors, webhook signatures | In its CI, through `conformance.Run`, `RunMCP` and `CheckVectors` |
-| [`mcp/template`](mcp/template) | MCP | In this repository's tests (`TestTemplatePasses`) |
+| [`mcp/template`](mcp/template) | REST, MCP | In this repository's tests (`TestTemplatePasses`) |
 
 A badge for a README:
 

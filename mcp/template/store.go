@@ -62,10 +62,12 @@ func (e *Entry) confirmedID() string {
 	return ""
 }
 
-// Source says where a workout came from.
+// Source says where a workout came from: kind is mcp or api, and external_id the workout's ID in
+// the app that sent it, for sync.
 type Source struct {
-	Kind   string `json:"kind"`
-	Client string `json:"client,omitempty"`
+	Kind       string `json:"kind"`
+	Client     string `json:"client,omitempty"`
+	ExternalID string `json:"external_id,omitempty"`
 }
 
 // Workout is one OWS workout.
@@ -133,6 +135,9 @@ type Store struct {
 	loc       *time.Location
 	now       func() time.Time
 	people    map[string]*personLog
+	// notify is told of every change to a workout, for webhooks; it must not block. Nil means
+	// nobody is listening.
+	notify func(person, event, workoutID string)
 }
 
 // NewStore makes an empty store. unit is "kg" or "lb".
@@ -142,9 +147,29 @@ func NewStore(c *Catalogue, unit string, loc *time.Location) *Store {
 
 type personLog struct {
 	s        *Store
+	person   string
 	workouts []*Workout
 	idem     map[string]written
 	undo     map[string]undoable
+	// external maps a workout's external_id to its ID, deleted ones included: a deleted
+	// external_id stays deleted, so a sync can't bring it back.
+	external map[string]string
+	// deleted are tombstones for the change feed.
+	deleted []Tombstone
+}
+
+// Tombstone is a deleted workout in the change feed: enough to remove a mirror's copy.
+type Tombstone struct {
+	ID        string    `json:"id"`
+	DeletedAt time.Time `json:"deleted_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// changed tells webhooks a workout changed.
+func (l *personLog) changed(event, workoutID string) {
+	if l.s.notify != nil {
+		l.s.notify(l.person, event, workoutID)
+	}
 }
 
 // written is a write's first result, replayed for a retry with the same idempotency key.
@@ -159,7 +184,7 @@ type Result interface{ summary() string }
 func (s *Store) person(id string) *personLog {
 	l, ok := s.people[id]
 	if !ok {
-		l = &personLog{s: s, idem: map[string]written{}, undo: map[string]undoable{}}
+		l = &personLog{s: s, person: id, idem: map[string]written{}, undo: map[string]undoable{}, external: map[string]string{}}
 		s.people[id] = l
 	}
 	return l
@@ -328,8 +353,11 @@ type ExerciseInput struct {
 	Sets       []SetInput `json:"sets"`
 }
 
-// LogWorkoutInput is log_workout's arguments.
+// LogWorkoutInput is log_workout's arguments, and POST /v1/workouts' body with started_at and
+// external_id.
 type LogWorkoutInput struct {
+	StartedAt      string          `json:"started_at"`
+	ExternalID     string          `json:"external_id"`
 	Date           string          `json:"date"`
 	Title          string          `json:"title"`
 	Notes          string          `json:"notes"`
@@ -338,10 +366,20 @@ type LogWorkoutInput struct {
 	IdempotencyKey string          `json:"idempotency_key"`
 }
 
-// LogWorkout stores a whole workout.
-func (l *personLog) LogWorkout(in LogWorkoutInput, client string) (Result, error) {
+// LogWorkout stores a whole workout. kind is the source: mcp or api. A workout whose external_id
+// is already stored replays it; one the person deleted stays deleted (not_found).
+func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result, error) {
 	if len(in.Program) > 0 {
 		return nil, invalid("program", "this server doesn't offer programs; leave it out")
+	}
+	if id, ok := l.external[in.ExternalID]; ok && in.ExternalID != "" {
+		_, w, _, _ := l.find(id)
+		if w == nil {
+			return nil, fail("not_found", "the workout with this external_id was deleted, and stays deleted")
+		}
+		out := l.logged(w, "Already logged", l.records())
+		out.Replayed = true
+		return out, nil
 	}
 	if len(in.Exercises) == 0 {
 		return nil, invalid("exercises", "give at least one exercise")
@@ -350,8 +388,16 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, client string) (Result, error
 	if err != nil {
 		return nil, err
 	}
+	if in.StartedAt != "" {
+		if started, err = time.Parse(time.RFC3339, in.StartedAt); err != nil {
+			return nil, invalid("started_at", "use RFC 3339, e.g. 2026-10-28T17:45:00-05:00")
+		}
+		if started.After(l.s.now().Add(5 * time.Minute)) {
+			return nil, invalid("started_at", "that hasn't happened yet")
+		}
+	}
 	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), StartedAt: started, Title: in.Title, Notes: in.Notes,
-		Source: Source{Kind: "mcp", Client: client}}
+		Source: Source{Kind: kind, Client: client, ExternalID: in.ExternalID}}
 	for i, ex := range in.Exercises {
 		field := fmt.Sprintf("exercises[%d]", i)
 		e, err := l.newEntry(field, ex.Name, ex.ExerciseID)
@@ -374,6 +420,10 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, client string) (Result, error
 	before := l.records()
 	w.UpdatedAt = l.s.now()
 	l.workouts = append(l.workouts, w)
+	if in.ExternalID != "" {
+		l.external[in.ExternalID] = w.ID
+	}
+	l.changed("workout.created", w.ID)
 	return l.logged(w, "Logged", before), nil
 }
 
@@ -409,7 +459,7 @@ type AddSetsInput struct {
 
 // AddSets adds sets to an entry, or to an exercise in a workout: by default the session in
 // progress (unfinished, started in the last 4 hours), starting one if there's none.
-func (l *personLog) AddSets(in AddSetsInput, client string) (Result, error) {
+func (l *personLog) AddSets(in AddSetsInput, kind, client string) (Result, error) {
 	if len(in.Sets) == 0 {
 		return nil, invalid("sets", "give at least one set")
 	}
@@ -422,16 +472,22 @@ func (l *personLog) AddSets(in AddSetsInput, client string) (Result, error) {
 		sets = append(sets, st)
 	}
 	before := l.records()
-	w, e, err := l.entryForSets(in, client)
+	w, e, err := l.entryForSets(in, kind, client)
 	if err != nil {
 		return nil, err
 	}
+	isNew := w.UpdatedAt.IsZero() // started by these sets
 	e.Sets = append(e.Sets, sets...)
 	w.UpdatedAt = l.s.now()
+	if isNew {
+		l.changed("workout.created", w.ID)
+	} else {
+		l.changed("workout.updated", w.ID)
+	}
 	return l.logged(w, "Added", before), nil
 }
 
-func (l *personLog) entryForSets(in AddSetsInput, client string) (*Workout, *Entry, error) {
+func (l *personLog) entryForSets(in AddSetsInput, kind, client string) (*Workout, *Entry, error) {
 	if in.EntryID != "" {
 		kind, w, e, _ := l.find(in.EntryID)
 		if kind != "entry" {
@@ -446,7 +502,7 @@ func (l *personLog) entryForSets(in AddSetsInput, client string) (*Workout, *Ent
 	if err != nil {
 		return nil, nil, err
 	}
-	w, err := l.workoutForSets(in.WorkoutID, client)
+	w, err := l.workoutForSets(in.WorkoutID, kind, client)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -461,7 +517,7 @@ func (l *personLog) entryForSets(in AddSetsInput, client string) (*Workout, *Ent
 	return w, e, nil
 }
 
-func (l *personLog) workoutForSets(id, client string) (*Workout, error) {
+func (l *personLog) workoutForSets(id, kind, client string) (*Workout, error) {
 	if id != "" && id != "current" {
 		kind, w, _, _ := l.find(id)
 		if kind != "workout" {
@@ -479,7 +535,7 @@ func (l *personLog) workoutForSets(id, client string) (*Workout, error) {
 	if current != nil {
 		return current, nil
 	}
-	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), StartedAt: now.In(l.s.loc), Source: Source{Kind: "mcp", Client: client}}
+	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), StartedAt: now.In(l.s.loc), Source: Source{Kind: kind, Client: client}}
 	l.workouts = append(l.workouts, w)
 	return w, nil
 }
@@ -565,6 +621,7 @@ func (l *personLog) Update(in UpdateInput) (Result, error) {
 		return nil, err
 	}
 	w.UpdatedAt = l.s.now()
+	l.changed("workout.updated", w.ID)
 	return l.logged(w, "Updated", before), nil
 }
 
@@ -707,6 +764,8 @@ func (l *personLog) Delete(id string) (Result, error) {
 	case "workout":
 		u.workout = w
 		l.workouts = slices.DeleteFunc(l.workouts, func(x *Workout) bool { return x == w })
+		now := l.s.now()
+		l.deleted = append(l.deleted, Tombstone{ID: w.ID, DeletedAt: now, UpdatedAt: now})
 	case "entry":
 		u.entry, u.parentID, u.position = e, w.ID, slices.Index(w.Exercises, e)
 		w.Exercises = slices.Delete(w.Exercises, u.position, u.position+1)
@@ -718,10 +777,19 @@ func (l *personLog) Delete(id string) (Result, error) {
 	}
 	token := newID("undo_")
 	l.undo[token] = u
+	if kind == "workout" {
+		l.changed("workout.deleted", w.ID)
+	} else {
+		l.changed("workout.updated", w.ID)
+	}
+	shown := kind
+	if kind == "entry" {
+		shown = "exercise" // the API core's name for an entry
+	}
 	return Deleted{
-		Kind: kind, ID: id, UndoToken: token, ExpiresAt: u.expiresAt,
+		Kind: shown, ID: id, UndoToken: token, ExpiresAt: u.expiresAt,
 		RecordsChanged: changedRecords(before, l.records()),
-		Summary:        fmt.Sprintf("Deleted the %s. It can be undone for 10 minutes.", kind),
+		Summary:        fmt.Sprintf("Deleted the %s. It can be undone for 10 minutes.", shown),
 	}, nil
 }
 
@@ -738,6 +806,7 @@ func (l *personLog) Undo(token string) (Result, error) {
 	case "workout":
 		w = u.workout
 		l.workouts = append(l.workouts, w)
+		l.deleted = slices.DeleteFunc(l.deleted, func(t Tombstone) bool { return t.ID == w.ID })
 	case "entry":
 		kind, parent, _, _ := l.find(u.parentID)
 		if kind != "workout" {
@@ -755,6 +824,7 @@ func (l *personLog) Undo(token string) (Result, error) {
 	}
 	delete(l.undo, token)
 	w.UpdatedAt = l.s.now()
+	l.changed("workout.updated", w.ID)
 	return l.logged(w, "Restored", before), nil
 }
 
@@ -782,6 +852,8 @@ type Logged struct {
 	Summary           string         `json:"summary"`
 	NewRecords        []Record       `json:"new_records"`
 	NeedsConfirmation []Confirmation `json:"needs_confirmation"`
+	// Replayed says nothing new was stored: an external_id already logged.
+	Replayed bool `json:"replayed,omitempty"`
 }
 
 func (r Logged) summary() string { return r.Summary }

@@ -1,0 +1,25 @@
+{
+  "name": "open-workout-partner-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An example app connecting to an Open Workout server: OAuth with PKCE, logging, the change feed and signed webhooks, on @openexercise/open-workout-client.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@openexercise/open-workout-client": "0.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

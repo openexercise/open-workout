@@ -54,14 +54,17 @@ var handlers = map[string]handler{
 		if err != nil {
 			return nil, false, err
 		}
-		return write(s, c, "log_workout", in.IdempotencyKey, func(l *personLog) (Result, error) { return l.LogWorkout(in, c.client) })
+		if in.StartedAt != "" || in.ExternalID != "" {
+			return nil, false, fail("invalid_input", "arguments: started_at and external_id are the REST API's; use date")
+		}
+		return write(s, c, "log_workout", in.IdempotencyKey, func(l *personLog) (Result, error) { return l.LogWorkout(in, "mcp", c.client) })
 	},
 	"add_sets": func(s *Store, c call) (Result, bool, error) {
 		in, err := decode[AddSetsInput](c.args)
 		if err != nil {
 			return nil, false, err
 		}
-		return write(s, c, "add_sets", in.IdempotencyKey, func(l *personLog) (Result, error) { return l.AddSets(in, c.client) })
+		return write(s, c, "add_sets", in.IdempotencyKey, func(l *personLog) (Result, error) { return l.AddSets(in, "mcp", c.client) })
 	},
 	"update_entry": func(s *Store, c call) (Result, bool, error) {
 		in, err := decode[UpdateInput](c.args)
