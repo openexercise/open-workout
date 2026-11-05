@@ -6,6 +6,10 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-05: `webhook-signature-vectors.json`: worked cases for `OWS-Signature`, the HMAC-SHA256
+  of `<t>.<body>` keyed with the subscription's secret. Conformance grows to the change feed and
+  its tombstones, webhook subscriptions, the MCP profile's core (`ows conformance mcp`) and the
+  progression vectors (`ows vectors`). The documents are unchanged.
 - 2026-11-05: The MCP profile's README adds what an AI client keeps to: log only what the person
   said, ask on `needs_confirmation`, show the summary and `warnings`, respect calm mode, and send
   an `idempotency_key`. The reference server adds the extension tool `match_exercises`. The core is

@@ -1,7 +1,12 @@
-// Package conformance checks that a server offers the reference REST API over an Open Workout
-// Schema log, by running a fixed script against it as one person: log a workout, read it back
-// equal, replay the Idempotency-Key and the external ID, change it, export the log and validate
-// every workout in it, delete it, and check a deleted external ID stays deleted.
+// Package conformance checks that a server offers the Open Workout API core and MCP profile.
+//
+// Run checks the REST API by running a fixed script against it as one person: log a workout, read
+// it back equal, replay the Idempotency-Key and the external ID, change it, find it in the change
+// feed, export the log and validate every workout in it, delete it, find its tombstone, check a
+// deleted external ID stays deleted, and subscribe a webhook and remove it. RunMCP checks an MCP
+// server against the tool profile (mcp.go), and CheckVectors checks an implementation of the
+// progression rules against the published cases (vectors.go). VerifySignature checks a webhook
+// delivery's OWS-Signature.
 //
 // The script writes one workout to the account and deletes it at the end, also when a check
 // fails part way. Use a test account: the token needs workouts:read and workouts:write, for a
@@ -17,6 +22,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -32,7 +38,8 @@ import (
 
 // Checks are the script's steps, in the order they run.
 var Checks = []string{
-	"discovery", "create", "read", "replay", "external-id", "update", "export", "delete", "stays-deleted",
+	"discovery", "create", "read", "replay", "external-id", "update", "change-feed", "export", "delete", "tombstone",
+	"stays-deleted", "webhooks",
 }
 
 // Status is a check's outcome.
@@ -105,7 +112,8 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 	r.input = r.workoutInput()
 	report := Report{BaseURL: base.String()}
 	steps := []func(context.Context) error{
-		r.discovery, r.create, r.read, r.replay, r.externalID, r.update, r.export, r.delete, r.staysDeleted,
+		r.discovery, r.create, r.read, r.replay, r.externalID, r.update, r.changeFeed, r.export, r.delete, r.tombstone,
+		r.staysDeleted, r.webhooks,
 	}
 	for i, step := range steps {
 		res := Result{Name: Checks[i], Status: Pass}
@@ -123,11 +131,11 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 // blocked says why a check can't run, when one it depends on failed.
 func (r *runner) blocked(check string) string {
 	switch {
-	case check == "discovery" || check == "create":
+	case check == "discovery" || check == "create" || check == "webhooks":
 		return ""
 	case r.id == "":
 		return "needs a workout, which create didn't store"
-	case check == "stays-deleted" && !r.deleted:
+	case (check == "stays-deleted" || check == "tombstone") && !r.deleted:
 		return "needs the workout deleted, which delete didn't do"
 	}
 	return ""
@@ -146,6 +154,7 @@ type runner struct {
 	id      string         // the stored workout's ID
 	path    string         // where it lives, from Location
 	stored  map[string]any // the workout as create returned it
+	since   time.Time      // the change feed's start: just before the server stored the workout
 	deleted bool
 }
 
@@ -211,6 +220,14 @@ func (r *runner) create(ctx context.Context) error {
 		return fmt.Errorf("the stored workout has no id")
 	}
 	r.id, r.stored = id, w
+	// The change feed reads from just before the server stored it, by the server's own clock when
+	// the workout says, so clock skew between here and there can't hide it.
+	r.since = r.now().Add(-5 * time.Minute)
+	if at, ok := w["updated_at"].(string); ok {
+		if t, err := time.Parse(time.RFC3339Nano, at); err == nil {
+			r.since = t.Add(-time.Second)
+		}
+	}
 	r.path = "/v1/workouts/" + url.PathEscape(id)
 	if loc := res.header.Get("Location"); loc == "" {
 		return fmt.Errorf("201 without a Location header")
@@ -649,4 +666,152 @@ func clip(b []byte) string {
 		return string(b[:200]) + "…"
 	}
 	return string(b)
+}
+
+// changeFeed: GET /v1/workouts?updated_since= lists the changed workout, valid, as a mirror
+// syncing the log would read it.
+func (r *runner) changeFeed(ctx context.Context) error {
+	feed, err := r.feed(ctx)
+	if err != nil {
+		return err
+	}
+	for _, raw := range feed.Workouts {
+		if problems := r.v.Validate(raw); len(problems) > 0 {
+			return fmt.Errorf("a workout in the change feed isn't valid OWS: %s", problems[0])
+		}
+		var w struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(raw, &w) == nil && w.ID == r.id {
+			return nil
+		}
+	}
+	return fmt.Errorf("the change feed since %s doesn't list workout %s", r.since.Format(time.RFC3339), r.id)
+}
+
+// tombstone: after the delete, the change feed with include_deleted lists the workout as a
+// tombstone in deleted, and no longer as a workout, so a mirror removes its copy.
+func (r *runner) tombstone(ctx context.Context) error {
+	feed, err := r.feed(ctx)
+	if err != nil {
+		return err
+	}
+	for _, raw := range feed.Workouts {
+		var w struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(raw, &w) == nil && w.ID == r.id {
+			return fmt.Errorf("the change feed still lists deleted workout %s as a workout", r.id)
+		}
+	}
+	for _, t := range feed.Deleted {
+		if t.ID == r.id {
+			if t.DeletedAt == "" || t.UpdatedAt == "" {
+				return fmt.Errorf("the tombstone for %s lacks deleted_at or updated_at", r.id)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("the change feed with include_deleted has no tombstone for workout %s", r.id)
+}
+
+type changeFeed struct {
+	Workouts []json.RawMessage `json:"workouts"`
+	Deleted  []struct {
+		ID        string `json:"id"`
+		DeletedAt string `json:"deleted_at"`
+		UpdatedAt string `json:"updated_at"`
+	} `json:"deleted"`
+}
+
+// feed reads the change feed since the workout was stored, with tombstones.
+func (r *runner) feed(ctx context.Context) (changeFeed, error) {
+	path := "/v1/workouts?" + url.Values{"updated_since": {r.since.UTC().Format(time.RFC3339Nano)}, "include_deleted": {"true"}, "limit": {"100"}}.Encode()
+	res, err := r.send(ctx, http.MethodGet, path, nil, nil, true)
+	if err != nil {
+		return changeFeed{}, err
+	}
+	if res.status != http.StatusOK {
+		return changeFeed{}, res.unexpected("GET the change feed", http.StatusOK)
+	}
+	if err := res.isJSON(); err != nil {
+		return changeFeed{}, err
+	}
+	var feed changeFeed
+	if err := json.Unmarshal(res.body, &feed); err != nil {
+		return changeFeed{}, fmt.Errorf("the change feed: %w", err)
+	}
+	return feed, nil
+}
+
+// webhooks: POST /v1/webhooks subscribes and answers 201 with the signing secret, the list shows
+// the subscription without it, and DELETE removes it. Nothing is delivered: the URL is on
+// example.com, and the subscription is gone before anything changes.
+func (r *runner) webhooks(ctx context.Context) error {
+	in := map[string]any{"url": "https://example.com/ows-conformance/" + r.run, "events": []string{"workout.created", "workout.updated", "workout.deleted"}}
+	res, err := r.send(ctx, http.MethodPost, "/v1/webhooks", in, nil, true)
+	if err != nil {
+		return err
+	}
+	if res.status != http.StatusCreated {
+		return res.unexpected("POST /v1/webhooks", http.StatusCreated)
+	}
+	var created struct {
+		ID     string `json:"id"`
+		Secret string `json:"secret"`
+	}
+	if err := json.Unmarshal(res.body, &created); err != nil || created.ID == "" {
+		return fmt.Errorf("POST /v1/webhooks: no id in %s", clip(res.body))
+	}
+	path := "/v1/webhooks/" + url.PathEscape(created.ID)
+	defer r.send(context.WithoutCancel(ctx), http.MethodDelete, path, nil, nil, true) //nolint:errcheck // cleanup
+	if created.Secret == "" {
+		return errors.New("POST /v1/webhooks: no secret to verify deliveries with")
+	}
+	listed, err := r.webhookListed(ctx, created.ID)
+	if err != nil {
+		return err
+	}
+	if !listed {
+		return fmt.Errorf("GET /v1/webhooks doesn't list subscription %s", created.ID)
+	}
+	res, err = r.send(ctx, http.MethodDelete, path, nil, nil, true)
+	if err != nil {
+		return err
+	}
+	if res.status != http.StatusNoContent && res.status != http.StatusOK {
+		return res.unexpected("DELETE "+path, http.StatusNoContent)
+	}
+	if listed, err = r.webhookListed(ctx, created.ID); err != nil {
+		return err
+	}
+	if listed {
+		return fmt.Errorf("subscription %s is still listed after DELETE", created.ID)
+	}
+	return nil
+}
+
+func (r *runner) webhookListed(ctx context.Context, id string) (bool, error) {
+	res, err := r.send(ctx, http.MethodGet, "/v1/webhooks", nil, nil, true)
+	if err != nil {
+		return false, err
+	}
+	if res.status != http.StatusOK {
+		return false, res.unexpected("GET /v1/webhooks", http.StatusOK)
+	}
+	var list struct {
+		Webhooks []map[string]any `json:"webhooks"`
+	}
+	if err := json.Unmarshal(res.body, &list); err != nil {
+		return false, fmt.Errorf("GET /v1/webhooks: %w", err)
+	}
+	for _, h := range list.Webhooks {
+		if h["id"] == id {
+			if _, ok := h["secret"]; ok {
+				return true, errors.New("GET /v1/webhooks shows the secret, which only the creation response may")
+			}
+			return true, nil
+		}
+	}
+	return false, nil
 }

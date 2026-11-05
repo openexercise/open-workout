@@ -1,0 +1,33 @@
+{
+  "description": "Test vectors for webhook signatures. OWS-Signature is \"t=<unix seconds>,v1=<hex HMAC-SHA256>\", where the HMAC is keyed with the subscription's secret (its UTF-8 bytes) over \"<t>.<body>\": the decimal timestamp, a full stop and the request body exactly as sent. A receiver recomputes it, compares in constant time, and refuses a timestamp too far from its own clock (five minutes is usual). Each case gives the secret, the timestamp, the body and the header a sender writes.",
+  "cases": [
+    {
+      "name": "a workout.created delivery",
+      "secret": "whsec_example",
+      "timestamp": 1793980800,
+      "body": "{\"event\":\"workout.created\",\"workout_id\":\"0b0c5f2e-6f1d-4a58-9a4e-2a1e9f5c1d77\",\"occurred_at\":\"2026-11-05T12:00:00Z\",\"subscription_id\":\"6c1f4f0e-3d0b-4a33-8f5e-1f0d2a9b7c11\",\"delivery_id\":\"d2b1c0a9-8e7f-4d6c-b5a4-938271605f4e\"}",
+      "signature": "t=1793980800,v1=ca18039599be0f8e28ecb93c9aa0c342c65a7cc17d046cf916a2bbf0ef41d04e"
+    },
+    {
+      "name": "the body is signed byte for byte, whitespace included",
+      "secret": "whsec_example",
+      "timestamp": 1793980800,
+      "body": "{\"event\": \"workout.deleted\",\n \"workout_id\": \"0b0c5f2e-6f1d-4a58-9a4e-2a1e9f5c1d77\"}",
+      "signature": "t=1793980800,v1=b7f4dcd393c2159e50671c906fc1b5aa3979df68c5c86b92dcdc371d2246716a"
+    },
+    {
+      "name": "an empty body",
+      "secret": "whsec_example",
+      "timestamp": 1793980800,
+      "body": "",
+      "signature": "t=1793980800,v1=f5f816d5c9be0782551b55078fe772b56fd453fa4f998983ef89b80b6a91d9c5"
+    },
+    {
+      "name": "non-ASCII text, as UTF-8 bytes",
+      "secret": "lcw_c2VjcmV0LWtleQ",
+      "timestamp": 1700000000,
+      "body": "{\"title\":\"Kniebeugen — Woche 2 🏋️\"}",
+      "signature": "t=1700000000,v1=6b3f205441b44cf20e648fe49d47d8aa8b2158f6d4cad7a7a9923865ca20b1cb"
+    }
+  ]
+}

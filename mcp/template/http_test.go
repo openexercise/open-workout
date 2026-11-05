@@ -23,7 +23,7 @@ func TestOverHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(newHandler(srv, "secret"))
+	ts := httptest.NewServer(newHandler(srv, tokenSet{write: "secret", read: "reader"}, "http://template.test"))
 	defer ts.Close()
 
 	res, err := http.Post(ts.URL, "application/json", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
