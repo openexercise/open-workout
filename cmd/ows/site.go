@@ -8,6 +8,7 @@ import (
 	"html/template"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -24,6 +25,7 @@ type page struct {
 	HTML        template.HTML
 	Schemas     []schemaDoc
 	Profile     *profile
+	API         *apiDoc
 }
 
 // schemaDoc is one JSON Schema file, read generically for rendering.
@@ -119,6 +121,36 @@ func buildSite(root, out string) error {
 	if err := render("schema", "schema.html", page{Title: "Schema", Description: "The Open Workout Schema, version 0 draft: a workout and a program.", Schemas: schemas}); err != nil {
 		return err
 	}
+	api, err := loadAPIDoc(filepath.Join(root, "api", "core.yaml"))
+	if err != nil {
+		return err
+	}
+	if err := render("api", "api.html", page{Title: "API core", Description: "The routes every Open Workout server serves: workouts, sets and entries, undo, the change feed, export, webhooks and exercise search.", API: api}); err != nil {
+		return err
+	}
+	// The quickstarts, with links between them made site paths.
+	quickstarts := map[string]string{"": "Quickstarts", "typescript": "TypeScript quickstart", "go": "Go quickstart", "mcp": "MCP quickstart", "matching": "Matching quickstart"}
+	for name, title := range quickstarts {
+		file := name + ".md"
+		if name == "" {
+			file = "README.md"
+		}
+		html, err := renderMarkdown(filepath.Join(root, "quickstarts", file))
+		if err != nil {
+			return err
+		}
+		html = template.HTML(quickstartLinks.ReplaceAllStringFunc(string(html), func(href string) string {
+			target := quickstartLinks.FindStringSubmatch(href)
+			if target[1] == "README" {
+				return `href="/quickstarts/` + target[2] + `"`
+			}
+			return `href="/quickstarts/` + target[1] + `/` + target[2] + `"`
+		}))
+		html = template.HTML(repoLinks.ReplaceAllString(string(html), `href="https://github.com/openexercise/open-workout/tree/main/$1"`))
+		if err := render(filepath.Join("quickstarts", name), "doc.html", page{Title: title, Description: title + " for Open Workout.", HTML: html}); err != nil {
+			return err
+		}
+	}
 	if err := render("mcp", "mcp.html", page{Title: "MCP tool profile", Description: "The tools an assistant uses over an Open Workout log, as the reference server lists them.", Profile: &prof}); err != nil {
 		return err
 	}
@@ -147,6 +179,7 @@ func buildSite(root, out string) error {
 		"schema/v0/progression-vectors.json":       filepath.Join(root, "schema", "v0", "progression-vectors.json"),
 		"schema/v0/webhook-signature-vectors.json": filepath.Join(root, "schema", "v0", "webhook-signature-vectors.json"),
 		"mcp/tools.json":                           filepath.Join(root, "mcp", "tools.json"),
+		"api/core.yaml":                            filepath.Join(root, "api", "core.yaml"),
 	}
 	examples, _ := filepath.Glob(filepath.Join(root, "examples", "*.json"))
 	for _, e := range examples {
@@ -287,6 +320,13 @@ func str(v any) string {
 	s, _ := v.(string)
 	return s
 }
+
+var (
+	// quickstartLinks are links from one quickstart to another (go.md, README.md#where-to-run-them).
+	quickstartLinks = regexp.MustCompile(`href="(README|typescript|go|mcp|matching)\.md(#[^"]*)?"`)
+	// repoLinks leave the quickstarts for the repository (../partner-app, ../mcp/README.md).
+	repoLinks = regexp.MustCompile(`href="\.\./([^"]*)"`)
+)
 
 func renderMarkdown(path string) (template.HTML, error) {
 	src, err := os.ReadFile(path)

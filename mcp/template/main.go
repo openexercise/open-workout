@@ -1,7 +1,8 @@
-// Command template is a small Open Workout MCP server to copy: it serves the profile's core
-// tools (../tools.json) over Streamable HTTP, keeping each person's log in memory. It is a
-// starting point, not a hosted service: replace the store with a database and the token check
-// with OAuth (README.md says what that takes).
+// Command template is a small Open Workout server to copy: the MCP profile's core tools
+// (../tools.json) over Streamable HTTP at /, and the API core (../../api/core.yaml) at /v1, over
+// one store keeping each person's log in memory. It is a starting point, not a hosted service:
+// replace the store with a database and the token check with OAuth (README.md says what that
+// takes).
 package main
 
 import (
@@ -23,6 +24,7 @@ func main() {
 	addr := flag.String("addr", "localhost:8080", "address to listen on")
 	unit := flag.String("unit", "kg", "the unit a load without one is in: kg or lb")
 	tz := flag.String("tz", "Local", "the person's timezone, for days")
+	allowHTTP := flag.Bool("allow-http-webhooks", false, "deliver webhooks to http URLs too, for local development")
 	flag.Parse()
 
 	if *unit != "kg" && *unit != "lb" {
@@ -36,7 +38,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	srv, err := NewServer(NewStore(catalogue, *unit, loc))
+	store := NewStore(catalogue, *unit, loc)
+	hooks := NewHooks(*allowHTTP)
+	store.notify = hooks.Notify
+	srv, err := NewServer(store)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,8 +55,8 @@ func main() {
 		tokens.read = rand.Text()
 		log.Printf("OWS_TEMPLATE_READ_TOKEN isn't set; this run's read-only token is %s", tokens.read)
 	}
-	log.Printf("serving the Open Workout MCP core on http://%s/", *addr)
-	log.Fatal(http.ListenAndServe(*addr, newHandler(srv, tokens, "http://"+*addr)))
+	log.Printf("serving the Open Workout MCP core on http://%s/ and the API core on http://%s/v1", *addr, *addr)
+	log.Fatal(http.ListenAndServe(*addr, newHandler(srv, &rest{store: store, hooks: hooks}, tokens, "http://"+*addr)))
 }
 
 // tokenSet is the template's two credentials for its one person: one an assistant logs with, and
@@ -59,9 +64,10 @@ func main() {
 type tokenSet struct{ write, read string }
 
 // newHandler serves MCP over Streamable HTTP at /, stateless with JSON responses so any instance
-// can answer any request, behind the bearer tokens. A request without one gets 401 naming the
-// protected resource metadata (RFC 9728), which a client reads to find where to sign in.
-func newHandler(srv *mcp.Server, tokens tokenSet, origin string) http.Handler {
+// can answer any request, and the API core at /v1, both behind the bearer tokens. A request
+// without one gets 401 naming the protected resource metadata (RFC 9728), which a client reads to
+// find where to sign in.
+func newHandler(srv *mcp.Server, api *rest, tokens tokenSet, origin string) http.Handler {
 	streamable := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return srv },
 		&mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
 	metadataPath := "/.well-known/oauth-protected-resource"
@@ -71,7 +77,11 @@ func newHandler(srv *mcp.Server, tokens tokenSet, origin string) http.Handler {
 	mux.Handle("GET "+metadataPath, auth.ProtectedResourceMetadataHandler(&oauthex.ProtectedResourceMetadata{
 		Resource: origin, AuthorizationServers: []string{}, ScopesSupported: []string{"mcp", "mcp:read"}, BearerMethodsSupported: []string{"header"},
 	}))
-	mux.Handle("/", auth.RequireBearerToken(verifier(tokens), &auth.RequireBearerTokenOptions{ResourceMetadataURL: origin + metadataPath})(streamable))
+	requireToken := auth.RequireBearerToken(verifier(tokens), &auth.RequireBearerTokenOptions{ResourceMetadataURL: origin + metadataPath})
+	mux.Handle("/", requireToken(streamable))
+	v1 := http.NewServeMux()
+	api.routes(v1)
+	mux.Handle("/v1/", requireToken(v1))
 	return mux
 }
 

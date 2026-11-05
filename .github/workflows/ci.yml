@@ -38,3 +38,23 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+  partner-app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: partner-app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: mcp/template/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: partner-app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      # Builds and runs the template server, and runs the app against it.
+      - run: npm test
