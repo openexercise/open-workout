@@ -6,6 +6,12 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-05: The MCP tool profile splits into a core and extensions. Each tool's `_meta` names
+  its profile under `dev.openworkout/profile` (`core`, or `lifterclub` for the reference server's
+  own); `instructions` are the core's and name no product, with the reference server's in
+  `extension_instructions`; `error_codes` becomes a list of `{code, profile, meaning}` and gains
+  `unauthenticated`, `nothing_to_log`'s profile and `parse_unsure`. Breaking for readers of
+  `error_codes`, which were strings.
 - 2026-11-05: Two new documents. `routine.json` is a person's routine: named rows of an exercise
   ID and optional targets (sets, a rep range, load, time, distance, rest) with an optional
   `linear`/`double`/`off` rule; targets, never performed work. `log.json` is a whole log as one

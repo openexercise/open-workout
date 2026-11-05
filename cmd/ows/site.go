@@ -49,14 +49,20 @@ type propertyDoc struct {
 	Description string
 }
 
-// profile is docs/ows/mcp/tools.json as Lifterclub publishes it.
+// profile is mcp/tools.json as the reference server publishes it. Each tool's _meta names its
+// profile: "core", or the reference server's own extensions.
 type profile struct {
-	Profile      string   `json:"profile"`
-	Version      string   `json:"version"`
-	Source       string   `json:"source"`
-	Instructions string   `json:"instructions"`
-	ErrorCodes   []string `json:"error_codes"`
-	Tools        []struct {
+	Profile               string `json:"profile"`
+	Version               string `json:"version"`
+	Source                string `json:"source"`
+	Instructions          string `json:"instructions"`
+	ExtensionInstructions string `json:"extension_instructions"`
+	ErrorCodes            []struct {
+		Code    string `json:"code"`
+		Profile string `json:"profile"`
+		Meaning string `json:"meaning"`
+	} `json:"error_codes"`
+	Tools []struct {
 		Name        string         `json:"name"`
 		Title       string         `json:"title"`
 		Description string         `json:"description"`
@@ -64,6 +70,9 @@ type profile struct {
 		Annotations struct {
 			ReadOnlyHint bool `json:"readOnlyHint"`
 		} `json:"annotations"`
+		Meta struct {
+			Profile string `json:"dev.openworkout/profile"`
+		} `json:"_meta"`
 	} `json:"tools"`
 }
 

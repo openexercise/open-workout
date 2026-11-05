@@ -14,6 +14,7 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | `schema/CHANGELOG.md` | What changed in v0 |
 | `mcp/tools.json` | The OWS MCP tool profile: the tools, their input schemas and annotations, generated from the reference server |
 | `mcp/README.md` | What a server offering those tools keeps to |
+| `mcp/template` | A template server to copy: Go, the official MCP SDK, an in-memory store, serving the profile's core tools. Its own module |
 | `examples` | A workout and a program in the format |
 | `api/core.yaml` | The Open Workout API core as OpenAPI 3.1: the routes any Open Workout server serves (workouts, sets and entries, undo, the change feed, export, webhooks, exercise search); workouts refer to `schema/v0/workout.json` |
 | `api/v1.yaml` | Lifterclub's whole API, the reference implementation: the core plus its own extensions |

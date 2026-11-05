@@ -16,6 +16,9 @@ jobs:
       - name: The Go client, a module of its own
         working-directory: clients/go
         run: go vet ./... && go test ./...
+      - name: The template MCP server, a module of its own
+        working-directory: mcp/template
+        run: go vet ./... && go test -race ./...
       - run: go run ./cmd/ows validate
       - run: go run ./cmd/ows site dist
   typescript-client:
