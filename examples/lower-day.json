@@ -1,0 +1,37 @@
+{
+  "$schema": "https://openworkout.dev/schema/v0/workout.json",
+  "ows_version": "0.1",
+  "id": "wk_9f2c",
+  "started_at": "2026-11-10T18:05:00-06:00",
+  "ended_at": "2026-11-10T19:02:00-06:00",
+  "date": "2026-11-10",
+  "timezone": "America/Chicago",
+  "updated_at": "2026-11-10T19:03:12Z",
+  "title": "Lower",
+  "source": { "kind": "api", "client": "myapp", "external_id": "myapp-42" },
+  "exercises": [
+    {
+      "id": "en_1",
+      "exercise": { "id": "oec:barbell-back-squat", "name": "Barbell Back Squat", "match": "catalogue" },
+      "text": "squat",
+      "sets": [
+        { "id": "st_1", "type": "warmup", "reps": 5, "load": { "value": 60, "unit": "kg" } },
+        { "id": "st_2", "reps": 5, "load": { "value": 100, "unit": "kg" }, "rpe": 8 },
+        { "id": "st_3", "type": "amrap", "reps": 9, "load": { "value": 100, "unit": "kg" } }
+      ]
+    },
+    {
+      "id": "en_2",
+      "exercise": { "id": null, "name": "zercher squat", "match": "unmatched" },
+      "text": "zercher squat",
+      "sets": [ { "id": "st_4", "reps": 8, "load": { "value": 60, "unit": "kg" } } ]
+    },
+    {
+      "id": "en_3",
+      "exercise": { "id": "oec:treadmill-run", "name": "Treadmill Run", "match": "catalogue" },
+      "sets": [ { "id": "st_5", "duration_s": 600, "distance_m": 1800, "calories": 140, "heart_rate_bpm": 151 } ]
+    }
+  ],
+  "estimates": ["/exercises/1/sets/0/load/unit"],
+  "notes": "Knees fine"
+}

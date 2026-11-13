@@ -18,7 +18,8 @@ An open format for a workout log, and the set of MCP tools an assistant uses to 
 | `mcp/template` | A template server to copy: Go, the official MCP SDK, an in-memory store, serving the MCP profile's core tools and the API core. Its own module |
 | `partner-app` | An example app on the TypeScript client: OAuth with PKCE, logging, the change feed and signed webhooks, tested against the template server |
 | `quickstarts` | TypeScript, Go, an assistant over MCP, and matching exercise names, each runnable against the template server or Lifterclub's sandbox |
-| `examples` | A workout and a program in the format |
+| `examples` | Workouts and a program in the format |
+| `docs/developer-guide.md` | How to write and read OWS documents and build a compatible server |
 | `api/core.yaml` | The Open Workout API core as OpenAPI 3.1: the routes any Open Workout server serves (workouts, sets and entries, undo, the change feed, export, webhooks, exercise search); workouts refer to `schema/v0/workout.json` |
 | `api/v1.yaml` | Lifterclub's whole API, the reference implementation: the core plus its own extensions |
 | `clients/go` | A thin Go client, package `openworkout`, standard library only: the module `github.com/openexercise/open-workout/clients/go` |
@@ -44,6 +45,8 @@ The site at [openworkout.dev](https://openworkout.dev) is built from this reposi
 ## Start building
 
 The [quickstarts](quickstarts/README.md) get an app, an assistant or a server going in a few minutes, against the [template server](mcp/template) on your machine or Lifterclub's sandbox. The API core is rendered at [openworkout.dev/api](https://openworkout.dev/api/).
+
+The [developer guide](docs/developer-guide.md) is the longer read: the workout, routine, log and program documents member by member, exercise IDs and matches, estimates, versions and extensions, the API core, webhooks, the MCP profile, and checking your own server.
 
 ## Check a server
 
@@ -159,7 +162,7 @@ An OWS entry refers to its exercise by an [Open Exercise](https://github.com/ope
 
 ## Taking part
 
-Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md), [GOVERNANCE.md](GOVERNANCE.md) for who decides and how, the [code of conduct](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately.
+Issues and pull requests are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, which files are published from Lifterclub, and how to propose a schema change; [GOVERNANCE.md](GOVERNANCE.md) for who decides and how, the [code of conduct](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md) for reporting vulnerabilities privately.
 
 ## Licence
 
