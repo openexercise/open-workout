@@ -6,6 +6,10 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-13: the MCP profile's `log_workout` names a real catalogue ID in its `exercise_id`
+  example, `oec:barbell-bench-press` (it said `oec:bench-press`, which the catalogue renamed). The
+  input schema's wording changed, not its shape, but conformance compares descriptions too, so a
+  server checked against the earlier profile sees the difference.
 - 2026-11-13: **0.1**, the first numbered version, with a prose specification (`v0/SPEC.md`): what
   the members mean, identity (including `previous_ids` renames and that a server mints no `oec:`
   IDs), and how documents change. Workouts, routines, programs and logs gain `ows_version`

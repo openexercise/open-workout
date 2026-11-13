@@ -20,6 +20,11 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **MCP profile:** `log_workout`'s `exercise_id` example names the catalogue's
+  `oec:barbell-bench-press` (it said the renamed `oec:bench-press`). Conformance compares input
+  schemas with descriptions, so a server checked against this profile needs the new wording.
+- **API reference (`api/v1.yaml`) and the TypeScript client's Lifterclub types:** the export holds
+  the person's own `exercises`, `exercise_phrases` and `food_phrases`.
 - **Contributor and developer guides:** `CONTRIBUTING.md` now covers setup, which paths are
   published from Lifterclub until v1, how a schema change is proposed here and lands there, adding
   conformance checks, the checks to run and releases; `docs/developer-guide.md` walks through the

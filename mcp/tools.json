@@ -497,7 +497,7 @@
               "additionalProperties": false,
               "properties": {
                 "exercise_id": {
-                  "description": "catalogue ID from search_exercises (e.g. oec:bench-press), when known",
+                  "description": "catalogue ID from search_exercises (e.g. oec:barbell-bench-press), when known",
                   "type": "string"
                 },
                 "name": {
