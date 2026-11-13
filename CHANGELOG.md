@@ -20,6 +20,9 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Lifterclub's export, published:** `api/v1.yaml` and the TypeScript client's `/lifterclub` types
+  gain the export's `exercises`, `exercise_phrases` and `food_phrases`, and an `ExercisePhrase`
+  schema (mightydotrun/lifterclub#165). The cores are unchanged; no client release yet.
 - **Contributor and developer guides:** `CONTRIBUTING.md` now covers setup, which paths are
   published from Lifterclub until v1, how a schema change is proposed here and lands there, adding
   conformance checks, the checks to run and releases; `docs/developer-guide.md` walks through the

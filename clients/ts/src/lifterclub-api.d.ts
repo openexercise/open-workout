@@ -1948,7 +1948,7 @@ export interface components {
                 meal: components["schemas"]["Meal"];
             }[];
         };
-        /** @description What the credential may read. `workouts`, `deleted_workouts`, `routines`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals` and `targets` with `meals:read`; `profile` with `profile:read`. */
+        /** @description What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` with `profile:read`. */
         LogExport: {
             /** @description The OWS version of the log, with workouts:read (0.1). */
             ows_version?: string;
@@ -1986,6 +1986,12 @@ export interface components {
                 withdrawn_at: string | null;
             }[];
             routines?: components["schemas"]["Routine"][];
+            /** @description The person's own exercises (`usr:`), oldest first, including any never logged; with `workouts:read` only. */
+            exercises?: components["schemas"]["ExerciseMatch"][];
+            /** @description Words the matcher learned to mean an exercise for this person, as GET /v1/phrases lists them; with `workouts:read` only. */
+            exercise_phrases?: components["schemas"]["ExercisePhrase"][];
+            /** @description Words the person taught to mean a food, as GET /v1/food-phrases lists them; with `meals:read` only. */
+            food_phrases?: components["schemas"]["FoodPhrase"][];
             program_suggestions_dismissed?: string[];
             program_enrollments?: components["schemas"]["ProgramEnrollment"][];
             workouts?: components["schemas"]["workout"][];
@@ -2934,6 +2940,12 @@ export interface components {
             deleted_at: string;
             /** Format: date-time */
             restore_until: string;
+        };
+        /** @description Words the matcher learned to mean an exercise for this person (FR-2.6). */
+        ExercisePhrase: {
+            phrase: string;
+            exercise_id: string;
+            exercise_name: string;
         };
         FoodPhrase: {
             phrase: string;
@@ -5073,11 +5085,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        phrases: {
-                            phrase: string;
-                            exercise_id: string;
-                            exercise_name: string;
-                        }[];
+                        phrases: components["schemas"]["ExercisePhrase"][];
                     };
                 };
             };
