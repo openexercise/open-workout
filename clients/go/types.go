@@ -17,10 +17,12 @@ const (
 
 // Workout is one workout: exercise entries with their sets, and where the record came from.
 type Workout struct {
-	Schema    string     `json:"$schema,omitempty"`
-	ID        string     `json:"id,omitempty"`
-	StartedAt time.Time  `json:"started_at"`
-	EndedAt   *time.Time `json:"ended_at,omitempty"`
+	Schema string `json:"$schema,omitempty"`
+	// OWSVersion is the Open Workout Schema version the workout was written to ("0.1").
+	OWSVersion string     `json:"ows_version,omitempty"`
+	ID         string     `json:"id,omitempty"`
+	StartedAt  time.Time  `json:"started_at"`
+	EndedAt    *time.Time `json:"ended_at,omitempty"`
 	// Date is the workout's local day (StartedAt in Timezone): file it under this day.
 	Date Date `json:"date,omitempty"`
 	// Timezone is the IANA zone the workout happened in.

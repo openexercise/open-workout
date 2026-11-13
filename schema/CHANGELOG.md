@@ -6,6 +6,14 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-13: **0.1**, the first numbered version, with a prose specification (`v0/SPEC.md`): what
+  the members mean, identity (including `previous_ids` renames and that a server mints no `oec:`
+  IDs), and how documents change. Workouts, routines, programs and logs gain `ows_version`
+  (`MAJOR.MINOR`; a document without one is 0.0). Workouts, entries, sets, routines, routine rows,
+  programs, days and slots allow `x-<vendor>-…` extension members, which readers ignore. A minor
+  version only adds; a reader keeps what it can't fully read, ignoring unknown members and treating
+  unknown enum values as unknown; validators use the schemas at their `$id`, the latest 0.x.
+  Additive.
 - 2026-11-12: The API core holds Open Workout alone. A write's `summary`, `new_records`,
   `parse_method` and `warnings`, a delete's `records_changed` and `summary`, and a list's `totals`
   and `summary` were required of every server and are now the reference server's own, with the
