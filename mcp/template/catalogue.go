@@ -16,11 +16,12 @@ var catalogueJSON []byte
 
 // CatalogueExercise is an exercise the server can match a name to.
 type CatalogueExercise struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Aliases        []string `json:"aliases"`
-	Equipment      []string `json:"equipment"`
-	PrimaryMuscles []string `json:"primary_muscles"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	MeasurementType string   `json:"measurement_type"`
+	Aliases         []string `json:"aliases"`
+	Equipment       []string `json:"equipment"`
+	PrimaryMuscles  []string `json:"primary_muscles"`
 }
 
 // Catalogue matches what people call exercises to catalogue IDs.
@@ -53,8 +54,8 @@ type scored struct {
 }
 
 // Match returns the exercise a name means exactly (its name or an alias, ignoring case,
-// punctuation and plurals), or else the close candidates, best first.
-func (c *Catalogue) Match(name string) (exact *CatalogueExercise, candidates []*CatalogueExercise) {
+// punctuation and plurals), or else the close candidates with their scores, best first.
+func (c *Catalogue) Match(name string) (exact *CatalogueExercise, candidates []scored) {
 	want := normalize(name)
 	for i := range c.exercises {
 		for _, n := range c.names(i) {
@@ -64,7 +65,7 @@ func (c *Catalogue) Match(name string) (exact *CatalogueExercise, candidates []*
 		}
 	}
 	for _, s := range c.rank(name, 0.5) {
-		candidates = append(candidates, s.exercise)
+		candidates = append(candidates, s)
 		if len(candidates) == 3 {
 			break
 		}

@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	openworkout "github.com/openexercise/open-workout"
 	"github.com/openexercise/open-workout/conformance"
 	"github.com/openexercise/open-workout/internal/ows"
 )
@@ -66,7 +67,9 @@ func validate(paths []string) error {
 	if len(paths) == 0 {
 		paths = []string{"examples"}
 	}
-	v, err := ows.NewValidator(".")
+	// The schemas built into the binary, so an installed ows validates outside a checkout. In a
+	// checkout, go run builds them from the working tree's schema/v0.
+	v, err := ows.NewValidatorFS(openworkout.Schemas)
 	if err != nil {
 		return err
 	}

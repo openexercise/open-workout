@@ -15,7 +15,7 @@ import (
 )
 
 // Kinds are the document kinds, by file name under schema/v0.
-var Kinds = []string{"workout", "program"}
+var Kinds = []string{"workout", "program", "routine", "log"}
 
 // Validator holds the compiled schemas, keyed by their $id.
 type Validator struct {
@@ -65,7 +65,7 @@ func NewValidatorFS(fsys fs.FS) (*Validator, error) {
 	return v, nil
 }
 
-// ValidateAs returns every problem in a document of a kind ("workout", "program"), whatever its
+// ValidateAs returns every problem in a document of a kind (one of Kinds), whatever its
 // $schema says. A server's response is a workout because of where it came from.
 func (v *Validator) ValidateAs(kind string, data []byte) []string {
 	s, ok := v.byKind[kind]

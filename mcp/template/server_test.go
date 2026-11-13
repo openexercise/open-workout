@@ -214,9 +214,17 @@ func TestLogEditAndUndo(t *testing.T) {
 	if len(confirm) != 2 || len(confirm[0].(map[string]any)["candidates"].([]any)) == 0 {
 		t.Fatalf("needs_confirmation = %v, want the close match with candidates and the unmatched one", confirm)
 	}
+	// A candidate carries what the core's Candidate requires.
+	candidate := confirm[0].(map[string]any)["candidates"].([]any)[0].(map[string]any)
+	for _, k := range []string{"id", "name", "measurement_type", "is_custom", "score"} {
+		if _, ok := candidate[k]; !ok {
+			t.Errorf("candidate %v has no %s", candidate, k)
+		}
+	}
 	estimates := w["estimates"].([]any)
-	if len(estimates) != 2 || estimates[0] != "/exercises/0/sets/1/load/unit" || estimates[1] != "/exercises/1/sets/0" {
-		t.Fatalf("estimates = %v, want the assumed unit and the estimated set", estimates)
+	// The start was worked out from the day, so it's an estimate too.
+	if len(estimates) != 3 || estimates[0] != "/started_at" || estimates[1] != "/exercises/0/sets/1/load/unit" || estimates[2] != "/exercises/1/sets/0" {
+		t.Fatalf("estimates = %v, want the start, the assumed unit and the estimated set", estimates)
 	}
 
 	// A retry replays; the same key for something else is refused.

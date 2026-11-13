@@ -1,13 +1,13 @@
 [
-  {"id": "oec:barbell-bench-press", "name": "Barbell Bench Press", "aliases": ["Bench Press", "Flat Bench Press", "Flat Bench", "bench", "barbell bench"], "equipment": ["barbell", "bench"], "primary_muscles": ["chest", "triceps"]},
-  {"id": "oec:dumbbell-bench-press", "name": "Dumbbell Bench Press", "aliases": ["dumbbell bench", "flat dumbbell press", "DB bench press"], "equipment": ["dumbbell", "bench"], "primary_muscles": ["chest", "triceps"]},
-  {"id": "oec:incline-dumbbell-bench-press", "name": "Incline Dumbbell Bench Press", "aliases": ["Incline Dumbbell Press", "Incline DB Press", "incline dumbbell bench"], "equipment": ["dumbbell", "adjustable-bench"], "primary_muscles": ["chest", "shoulders"]},
-  {"id": "oec:barbell-back-squat", "name": "Barbell Back Squat", "aliases": ["Back Squat", "Barbell Squat", "Squat", "high bar squat", "low bar squat"], "equipment": ["barbell", "squat-rack"], "primary_muscles": ["quadriceps", "glutes"]},
-  {"id": "oec:barbell-deadlift", "name": "Barbell Deadlift", "aliases": ["Deadlift", "Conventional Deadlift", "DL"], "equipment": ["barbell"], "primary_muscles": ["hamstrings", "glutes", "lower-back"]},
-  {"id": "oec:barbell-romanian-deadlift", "name": "Barbell Romanian Deadlift", "aliases": ["RDL", "Barbell RDL", "Romanian Deadlift"], "equipment": ["barbell"], "primary_muscles": ["hamstrings", "glutes"]},
-  {"id": "oec:barbell-overhead-press", "name": "Barbell Overhead Press", "aliases": ["Overhead Press", "Strict Press", "OHP", "Military Press"], "equipment": ["barbell"], "primary_muscles": ["shoulders", "triceps"]},
-  {"id": "oec:pull-up", "name": "Pull-Up", "aliases": ["pullup", "pull up", "overhand pull-up"], "equipment": ["pull-up-bar"], "primary_muscles": ["lats", "biceps"]},
-  {"id": "oec:dumbbell-curl", "name": "Dumbbell Curl", "aliases": ["Dumbbell Biceps Curl", "DB Curl"], "equipment": ["dumbbell"], "primary_muscles": ["biceps"]},
-  {"id": "oec:plank", "name": "Plank", "aliases": ["Forearm Plank", "Front Plank"], "equipment": [], "primary_muscles": ["abdominals"]},
-  {"id": "oec:treadmill-run", "name": "Treadmill Run", "aliases": ["Treadmill Running", "treadmill"], "equipment": ["treadmill"], "primary_muscles": []}
+  {"id": "oec:barbell-bench-press", "name": "Barbell Bench Press", "measurement_type": "weight_reps", "aliases": ["Bench Press", "Flat Bench Press", "Flat Bench", "bench", "barbell bench"], "equipment": ["barbell", "bench"], "primary_muscles": ["chest", "triceps"]},
+  {"id": "oec:dumbbell-bench-press", "name": "Dumbbell Bench Press", "measurement_type": "weight_reps", "aliases": ["dumbbell bench", "flat dumbbell press", "DB bench press"], "equipment": ["dumbbell", "bench"], "primary_muscles": ["chest", "triceps"]},
+  {"id": "oec:incline-dumbbell-bench-press", "name": "Incline Dumbbell Bench Press", "measurement_type": "weight_reps", "aliases": ["Incline Dumbbell Press", "Incline DB Press", "incline dumbbell bench"], "equipment": ["dumbbell", "adjustable-bench"], "primary_muscles": ["chest", "shoulders"]},
+  {"id": "oec:barbell-back-squat", "name": "Barbell Back Squat", "measurement_type": "weight_reps", "aliases": ["Back Squat", "Barbell Squat", "Squat", "high bar squat", "low bar squat"], "equipment": ["barbell", "squat-rack"], "primary_muscles": ["quadriceps", "glutes"]},
+  {"id": "oec:barbell-deadlift", "name": "Barbell Deadlift", "measurement_type": "weight_reps", "aliases": ["Deadlift", "Conventional Deadlift", "DL"], "equipment": ["barbell"], "primary_muscles": ["hamstrings", "glutes", "lower-back"]},
+  {"id": "oec:barbell-romanian-deadlift", "name": "Barbell Romanian Deadlift", "measurement_type": "weight_reps", "aliases": ["RDL", "Barbell RDL", "Romanian Deadlift"], "equipment": ["barbell"], "primary_muscles": ["hamstrings", "glutes"]},
+  {"id": "oec:barbell-overhead-press", "name": "Barbell Overhead Press", "measurement_type": "weight_reps", "aliases": ["Overhead Press", "Strict Press", "OHP", "Military Press"], "equipment": ["barbell"], "primary_muscles": ["shoulders", "triceps"]},
+  {"id": "oec:pull-up", "name": "Pull-Up", "measurement_type": "reps", "aliases": ["pullup", "pull up", "overhand pull-up"], "equipment": ["pull-up-bar"], "primary_muscles": ["lats", "biceps"]},
+  {"id": "oec:dumbbell-curl", "name": "Dumbbell Curl", "measurement_type": "weight_reps", "aliases": ["Dumbbell Biceps Curl", "DB Curl"], "equipment": ["dumbbell"], "primary_muscles": ["biceps"]},
+  {"id": "oec:plank", "name": "Plank", "measurement_type": "duration", "aliases": ["Forearm Plank", "Front Plank"], "equipment": [], "primary_muscles": ["abdominals"]},
+  {"id": "oec:treadmill-run", "name": "Treadmill Run", "measurement_type": "distance_duration", "aliases": ["Treadmill Running", "treadmill"], "equipment": ["treadmill"], "primary_muscles": []}
 ]

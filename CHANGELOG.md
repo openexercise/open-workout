@@ -20,6 +20,20 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **`ows validate` knows every document and needs no checkout:** it validates logs and routines as
+  well as workouts and programs, and uses the schemas built into the command, so an installed
+  `ows` works anywhere. `examples/` gains a routine and a log.
+- **Conformance: `document`:** a new check posts an OWS workout document as another app exports it
+  and checks the server keeps its time zone, local day, loads and set types, reads
+  `source.external_id`, and ignores what it assigns and every `x-` member, as the API core says.
+  A server that refused documents passed before; it fails now.
+- **The template server takes OWS documents:** `POST /v1/workouts` accepts `$schema`,
+  `ows_version`, `timezone`, `estimates` (as pointers into the body), `ended_at`, loads as
+  `{value, unit}`, set types, an entry's `exercise` and `text`, `source.external_id` and `x-`
+  members at any level, so the Go client's `LogDocument` works against it. Workouts now carry
+  `date` and `timezone`, and a start worked out from a day is listed as `/started_at` in
+  `estimates`. Candidates to confirm, and search results, carry `measurement_type`, `is_custom`
+  and `score`, as the API core requires.
 - **MCP profile:** `log_workout`'s `exercise_id` example names the catalogue's
   `oec:barbell-bench-press` (it said the renamed `oec:bench-press`). Conformance compares input
   schemas with descriptions, so a server checked against this profile needs the new wording.

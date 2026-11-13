@@ -31,6 +31,7 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	_ "time/tzdata" // the document check works out a local day wherever it runs
 
 	openworkout "github.com/openexercise/open-workout"
 	"github.com/openexercise/open-workout/internal/ows"
@@ -39,7 +40,7 @@ import (
 // Checks are the script's steps, in the order they run.
 var Checks = []string{
 	"discovery", "create", "read", "replay", "external-id", "update", "change-feed", "export", "delete", "tombstone",
-	"stays-deleted", "webhooks",
+	"stays-deleted", "webhooks", "document",
 }
 
 // Status is a check's outcome.
@@ -113,7 +114,7 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 	report := Report{BaseURL: base.String()}
 	steps := []func(context.Context) error{
 		r.discovery, r.create, r.read, r.replay, r.externalID, r.update, r.changeFeed, r.export, r.delete, r.tombstone,
-		r.staysDeleted, r.webhooks,
+		r.staysDeleted, r.webhooks, r.document,
 	}
 	for i, step := range steps {
 		res := Result{Name: Checks[i], Status: Pass}
@@ -131,7 +132,7 @@ func Run(ctx context.Context, cfg Config) (Report, error) {
 // blocked says why a check can't run, when one it depends on failed.
 func (r *runner) blocked(check string) string {
 	switch {
-	case check == "discovery" || check == "create" || check == "webhooks":
+	case check == "discovery" || check == "create" || check == "webhooks" || check == "document":
 		return ""
 	case r.id == "":
 		return "needs a workout, which create didn't store"
@@ -814,4 +815,97 @@ func (r *runner) webhookListed(ctx context.Context, id string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// documentZone is the time zone of the workout document the document check posts.
+const documentZone = "America/Chicago"
+
+// document: an OWS workout document, as another app exports it, can be posted as it is. The
+// members the server assigns are ignored, x- extension members at any level are ignored,
+// source.external_id is read as external_id, and timezone, loads as {value, unit} and set types
+// are kept. The workout is deleted afterwards.
+func (r *runner) document(ctx context.Context) error {
+	loc, err := time.LoadLocation(documentZone)
+	if err != nil {
+		return err
+	}
+	started := r.now().Add(-2 * time.Hour).In(loc).Truncate(time.Second)
+	ext := "ows-conformance-document-" + r.run
+	doc := map[string]any{
+		"$schema":       "https://openworkout.dev/schema/v0/workout.json",
+		"ows_version":   "0.1",
+		"id":            "another-apps-id",
+		"started_at":    started.Format(time.RFC3339),
+		"date":          started.Format(time.DateOnly),
+		"timezone":      documentZone,
+		"title":         "ows conformance document " + r.run,
+		"source":        map[string]any{"kind": "app", "client": "another-app", "external_id": ext},
+		"x-conformance": map[string]any{"run": r.run},
+		"exercises": []any{map[string]any{
+			"id":            "another-apps-entry",
+			"exercise":      map[string]any{"id": nil, "name": "Barbell Bench Press", "match": "unmatched"},
+			"text":          "Barbell Bench Press",
+			"x-conformance": true,
+			"sets": []any{
+				map[string]any{"type": "warmup", "reps": 8, "load": map[string]any{"value": 60, "unit": "kg"}},
+				map[string]any{"id": "another-apps-set", "reps": 5, "load": map[string]any{"value": 100, "unit": "kg"}, "x-conformance": 1},
+			},
+		}},
+		"estimates": []any{},
+	}
+	res, err := r.send(ctx, http.MethodPost, "/v1/workouts", doc, header("Idempotency-Key", "ows-conformance-"+random()), true)
+	if err != nil {
+		return err
+	}
+	if res.status != http.StatusCreated {
+		return res.unexpected("POST an OWS workout document", http.StatusCreated)
+	}
+	if loc := res.header.Get("Location"); loc != "" {
+		defer r.send(context.WithoutCancel(ctx), http.MethodDelete, loc, nil, nil, true) //nolint:errcheck // cleanup
+	}
+	w, err := r.written(res)
+	if err != nil {
+		return err
+	}
+	if id, _ := w["id"].(string); id == "" || id == "another-apps-id" {
+		return fmt.Errorf("the workout's id is %q: the server assigns its own", w["id"])
+	}
+	if got := fmt.Sprint(w["timezone"]); got != documentZone {
+		return fmt.Errorf("timezone is %s, want %s as sent", got, documentZone)
+	}
+	if got := fmt.Sprint(w["date"]); got != started.Format(time.DateOnly) {
+		return fmt.Errorf("date is %s, want %s, started_at's day in %s", got, started.Format(time.DateOnly), documentZone)
+	}
+	source, _ := w["source"].(map[string]any)
+	if got := fmt.Sprint(source["external_id"]); got != ext {
+		return fmt.Errorf("source.external_id is %s, want %s, read from the document's source", got, ext)
+	}
+	entries, _ := w["exercises"].([]any)
+	if len(entries) != 1 {
+		return fmt.Errorf("%d exercises, want 1", len(entries))
+	}
+	sets, _ := entries[0].(map[string]any)["sets"].([]any)
+	if len(sets) != 2 {
+		return fmt.Errorf("%d sets, want 2", len(sets))
+	}
+	want := []struct {
+		kind  string
+		value float64
+	}{{"warmup", 60}, {"working", 100}}
+	for i, s := range sets {
+		set, _ := s.(map[string]any)
+		kind, _ := set["type"].(string)
+		if kind == "" {
+			kind = "working"
+		}
+		load, _ := set["load"].(map[string]any)
+		value, _ := load["value"].(float64)
+		if kind != want[i].kind || value != want[i].value || load["unit"] != "kg" {
+			return fmt.Errorf("set %d is %s %v, want %s %v kg as sent", i, kind, set["load"], want[i].kind, want[i].value)
+		}
+	}
+	if strings.Contains(string(res.body), "x-conformance") {
+		return errors.New("the x- members came back: writes ignore them")
+	}
+	return nil
 }
