@@ -219,6 +219,166 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/meals/{id}/copy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log a meal again
+         * @description "The same as yesterday's lunch": a new meal with the same items (their words, foods and
+         *     amounts), each counted again from its food as it is now, on the day or time given (today when
+         *     none is). An item whose food wasn't confirmed is matched again from its words. Needs
+         *     health-data consent.
+         */
+        post: operations["copyMeal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The user's recipes
+         * @description Open Food Log recipes, by name.
+         */
+        get: operations["listRecipes"];
+        put?: never;
+        /**
+         * Make a recipe
+         * @description A food made of other foods (OFL section 8). Each line is matched and weighed as a meal item
+         *     is, and must name its food surely or give its own nutrients. Its nutrients are its lines'
+         *     over its yield: `yield_g`, else the lines' grams times `cooking_yield_factor`, else the
+         *     lines' grams; a nutrient one line lacks is left out. It is then one of the person's foods: a
+         *     meal item names it by its `id`, by weight or in `serving`s.
+         */
+        post: operations["createRecipe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/recipes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's ID (recipe:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One recipe */
+        get: operations["getRecipe"];
+        /**
+         * Replace a recipe
+         * @description Its name, lines and the rest, as POST /v1/recipes takes them; its ID stays, so meals and saved meals naming it still do. Meals already logged keep what they counted.
+         */
+        put: operations["replaceRecipe"];
+        post?: never;
+        /**
+         * Delete a recipe
+         * @description Meals that logged it keep its name and what they counted; a saved meal naming it is matched from its words when next logged.
+         */
+        delete: operations["deleteRecipe"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/saved-meals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The user's saved meals
+         * @description Open Food Log saved meals, by name. Their items' grams and nutrients are left out when the person asked not to see numbers.
+         */
+        get: operations["listSavedMeals"];
+        put?: never;
+        /**
+         * Save a meal to log again
+         * @description A meal the person keeps to log again ("my usual breakfast"): its items, as POST /v1/meals
+         *     takes them, or a logged meal's (`from_meal_id`), kept as they were logged. A sentence naming
+         *     it by name logs its items. Names are one per person. Needs health-data consent.
+         */
+        post: operations["createSavedMeal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/saved-meals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The saved meal's ID (saved:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** One saved meal */
+        get: operations["getSavedMeal"];
+        /**
+         * Replace a saved meal
+         * @description Its name, items and the rest, as POST /v1/saved-meals takes them; its ID stays. Needs health-data consent.
+         */
+        put: operations["replaceSavedMeal"];
+        post?: never;
+        /**
+         * Delete a saved meal
+         * @description Meals logged from it stay. No consent needed.
+         */
+        delete: operations["deleteSavedMeal"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/saved-meals/{id}/log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The saved meal's ID (saved:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log a saved meal
+         * @description A new meal titled with the saved meal's name, of its type unless another is given, each item
+         *     counted again from its food as it is now (OFL section 8); an amount the saved meal marks as
+         *     estimated stays marked. Needs health-data consent.
+         */
+        post: operations["logSavedMeal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/meal-items/{id}": {
         parameters: {
             query?: never;
@@ -346,7 +506,7 @@ export interface components {
             status: number;
             detail?: string;
             /** @enum {unknown} */
-            code: "invalid_input" | "consent_required" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error";
+            code: "invalid_input" | "consent_required" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error" | "barcode_unavailable";
             /** @description For invalid_input. */
             field?: string;
         };
@@ -392,6 +552,10 @@ export interface components {
             meals: components["schemas"]["Meal"][];
             /** @description The person's own foods that the meals name, so a reader elsewhere can resolve them. */
             foods?: components["schemas"]["Food"][];
+            /** @description The person's recipes, which the meals and saved meals may name. */
+            recipes?: components["schemas"]["Recipe"][];
+            /** @description Meals the person keeps to log again (OFL v0.2). */
+            saved_meals?: components["schemas"]["SavedMeal"][];
             /** @description Meals the person deleted, newest first, for a server that keeps them. */
             deleted_meals?: {
                 /** Format: date-time */
@@ -406,6 +570,127 @@ export interface components {
             unit: "g" | "kg" | "oz" | "lb" | "ml" | "l" | "fl_oz" | "portion" | "serving";
             /** @description With unit portion */
             portion?: string;
+        };
+        /** @description When a meal logged again was eaten, all optional; today when nothing is given. */
+        LogAgainInput: {
+            /**
+             * Format: date
+             * @description The user's local day.
+             */
+            date?: string;
+            /** Format: date-time */
+            eaten_at?: string;
+            /** @description The IANA zone the person ate in. */
+            timezone?: string;
+            /**
+             * @description The meal's type; the one it had when left out.
+             * @enum {string}
+             */
+            meal_type?: "breakfast" | "lunch" | "dinner" | "snack";
+        };
+        /** @description An ingredient of a recipe, or an item of a saved meal, shaped like an Open Food Log meal item without an ID. */
+        FoodLine: {
+            text: string;
+            food: {
+                id: string | null;
+                name: string;
+                /** @enum {string} */
+                match: "catalogue" | "close" | "custom" | "unmatched" | "none";
+            };
+            amount?: components["schemas"]["FoodAmount"];
+            share?: number;
+            grams?: number;
+            nutrients?: components["schemas"]["FoodNutrients"];
+            notes?: string;
+        };
+        RecipeInput: {
+            name: string;
+            /** @description The ingredients, raw as they go in, each as a meal item. */
+            lines: components["schemas"]["MealItemInput"][];
+            /** @description How many servings the whole makes. */
+            servings: number;
+            /** @description What the whole weighs made. Needed when a line has no weight (a volume of a food with no density). */
+            yield_g?: number;
+            /** @description Made weight over raw weight (0.75 for a roast that loses a quarter), used when yield_g is absent. */
+            cooking_yield_factor?: number;
+            instructions?: string;
+            notes?: string;
+        };
+        /** @description An Open Food Log v0.2 recipe (https://openfoodlog.org/schema/v0/recipe.json). */
+        Recipe: {
+            /** @constant */
+            $schema: "https://openfoodlog.org/schema/v0/recipe.json";
+            ofl_version: string;
+            /** @description recipe:…, the food_id a meal item names it by. */
+            id: string;
+            name: string;
+            notes?: string;
+            instructions?: string;
+            lines: components["schemas"]["FoodLine"][];
+            servings: number;
+            yield_g?: number;
+            cooking_yield_factor?: number;
+            nutrients_per_100g: components["schemas"]["FoodNutrients"];
+            nutrients_per_serving: components["schemas"]["FoodNutrients"];
+            source: {
+                /** @enum {string} */
+                kind: "app" | "mcp" | "api" | "import";
+                client?: string;
+                external_id: string | null;
+            };
+            /** Format: date-time */
+            updated_at: string;
+        };
+        RecipeList: {
+            recipes: components["schemas"]["Recipe"][];
+        };
+        /** @description Give items, or from_meal_id, not both. */
+        SavedMealInput: {
+            /** @description What the person calls it ("usual breakfast"); a sentence naming it logs it. */
+            name: string;
+            /**
+             * @description The type to log it as; with from_meal_id, that meal's when left out.
+             * @enum {string}
+             */
+            meal_type?: "breakfast" | "lunch" | "dinner" | "snack";
+            label?: string;
+            notes?: string;
+            items?: components["schemas"]["MealItemInput"][];
+            /** @description As on POST /v1/meals: items whose amount the person didn't give. */
+            estimates?: string[];
+            /**
+             * Format: uuid
+             * @description A logged meal to save, its items as they were logged.
+             */
+            from_meal_id?: string;
+        };
+        /** @description An Open Food Log v0.2 saved meal (https://openfoodlog.org/schema/v0/saved-meal.json). */
+        SavedMeal: {
+            /** @constant */
+            $schema: "https://openfoodlog.org/schema/v0/saved-meal.json";
+            /** @description 0.2: saved meals arrived then. */
+            ofl_version: string;
+            /** @description saved:… */
+            id: string;
+            name: string;
+            /** @enum {string} */
+            meal_type?: "breakfast" | "lunch" | "dinner" | "snack";
+            label?: string;
+            notes?: string;
+            /** @description grams and nutrients are what each counted when saved, a preview; logging counts again. */
+            items: components["schemas"]["FoodLine"][];
+            source: {
+                /** @enum {string} */
+                kind: "app" | "mcp" | "api" | "import";
+                client?: string;
+                external_id: string | null;
+            };
+            /** Format: date-time */
+            updated_at: string;
+            estimates: string[];
+        };
+        SavedMealList: {
+            saved_meals: components["schemas"]["SavedMeal"][];
         };
         MealItemInput: {
             /** @description What the person called it. May be left empty with a food_id. */
@@ -485,11 +770,11 @@ export interface components {
             confidence?: number | null;
             notes?: string | null;
         };
-        /** @description An Open Food Log v0.1 meal (https://openfoodlog.org/schema/v0/meal.json). */
+        /** @description An Open Food Log v0.2 meal (https://openfoodlog.org/schema/v0/meal.json). */
         Meal: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/meal.json";
-            /** @description The Open Food Log version, as MAJOR.MINOR: 0.1. */
+            /** @description The Open Food Log version, as MAJOR.MINOR: 0.2. */
             ofl_version: string;
             /** Format: uuid */
             id: string;
@@ -693,7 +978,7 @@ export interface components {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/targets.json";
             /** @constant */
-            ofl_version: "0.1";
+            ofl_version: "0.2";
             /** Format: date-time */
             updated_at?: string;
             targets: components["schemas"]["Target"][];
@@ -827,9 +1112,9 @@ export interface components {
             /** @description The amount to assume when a person names the food without one. At most one. */
             is_default?: boolean;
         };
-        /** @description An Open Food Log v0.1 food (https://openfoodlog.org/schema/v0/food.json). */
+        /** @description An Open Food Log v0.2 food (https://openfoodlog.org/schema/v0/food.json). */
         Food: {
-            /** @description On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.1. */
+            /** @description On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.2. */
             ofl_version?: string;
             id: string;
             name: string;
@@ -1451,6 +1736,381 @@ export interface operations {
             429: components["responses"]["RateLimited"];
         };
     };
+    copyMeal: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Any unique string, up to 200 characters. Retrying with the same key never writes twice. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogAgainInput"];
+            };
+        };
+        responses: {
+            /** @description An earlier request with the same Idempotency-Key; nothing new was stored. */
+            200: {
+                headers: {
+                    "Idempotent-Replayed": components["headers"]["IdempotentReplayed"];
+                    /** @description The meal's URL. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealWritten"];
+                };
+            };
+            /** @description Logged. */
+            201: {
+                headers: {
+                    /** @description The new meal's URL. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealWritten"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listRecipes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recipes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipeList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    createRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecipeInput"];
+            };
+        };
+        responses: {
+            /** @description Made. */
+            201: {
+                headers: {
+                    /** @description The recipe's URL. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's ID (recipe:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recipe. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    replaceRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's ID (recipe:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecipeInput"];
+            };
+        };
+        responses: {
+            /** @description The recipe after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Recipe"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteRecipe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The recipe's ID (recipe:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listSavedMeals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved meals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedMealList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    createSavedMeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedMealInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            201: {
+                headers: {
+                    /** @description The saved meal's URL. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedMeal"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    getSavedMeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The saved meal's ID (saved:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved meal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedMeal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    replaceSavedMeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The saved meal's ID (saved:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedMealInput"];
+            };
+        };
+        responses: {
+            /** @description The saved meal after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedMeal"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteSavedMeal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The saved meal's ID (saved:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    logSavedMeal: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Any unique string, up to 200 characters. Retrying with the same key never writes twice. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                /** @description The saved meal's ID (saved:…). */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogAgainInput"];
+            };
+        };
+        responses: {
+            /** @description An earlier request with the same Idempotency-Key; nothing new was stored. */
+            200: {
+                headers: {
+                    "Idempotent-Replayed": components["headers"]["IdempotentReplayed"];
+                    /** @description The meal's URL. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealWritten"];
+                };
+            };
+            /** @description Logged. */
+            201: {
+                headers: {
+                    /** @description The new meal's URL. */
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MealWritten"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
     deleteMealItem: {
         parameters: {
             query?: never;
@@ -1611,7 +2271,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             429: components["responses"]["RateLimited"];
-            /** @description `internal_error`: a barcode couldn't be looked up just now. `Retry-After` says when to try again. */
+            /** @description `barcode_unavailable`: a barcode couldn't be looked up just now. `Retry-After` says when to try again. */
             503: {
                 headers: {
                     "Retry-After"?: number;
