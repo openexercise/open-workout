@@ -1965,10 +1965,20 @@ export interface components {
             $schema?: "https://openworkout.dev/schema/v0/workout.json";
             /** @description Assigned by the server that stores the workout. */
             id?: string;
-            /** Format: date-time */
+            /**
+             * Format: date-time
+             * @description When the workout started. Listed in estimates as /started_at when it was worked out (from a day alone, or the time it was logged) rather than given: trust its day, not its hour.
+             */
             started_at: string;
             /** Format: date-time */
             ended_at?: string;
+            /**
+             * Format: date
+             * @description The workout's local day: started_at in timezone. A reader files the workout under this day, wherever the reader is.
+             */
+            date?: string;
+            /** @description The IANA time zone the workout happened in (America/Chicago), so its local day stays put across daylight-saving changes and when the person moves. */
+            timezone?: string;
             /**
              * Format: date-time
              * @description When the stored record last changed, by the server's clock: the workout, an entry, a set or the program label. For mirroring; absent from a document that was never stored.

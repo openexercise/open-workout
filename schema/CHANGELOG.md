@@ -6,6 +6,12 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-12: A workout carries its local day. `date` is the day it happened on (`started_at` in
+  `timezone`), and `timezone` is the IANA zone it happened in, as Open Food Log meals have them, so
+  an evening workout in Chicago isn't filed under the next day by a reader in UTC. `started_at` is
+  listed in `estimates` as `/started_at` when a server worked it out (from a day alone, or the time
+  of logging) rather than being given it. Both members are optional. Additive for readers. A
+  validator of the earlier draft refuses them, since workouts allow no members they don't name.
 - 2026-11-05: `webhook-signature-vectors.json`: worked cases for `OWS-Signature`, the HMAC-SHA256
   of `<t>.<body>` keyed with the subscription's secret. Conformance grows to the change feed and
   its tombstones, webhook subscriptions, the MCP profile's core (`ows conformance mcp`) and the

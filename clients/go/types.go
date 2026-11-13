@@ -21,6 +21,10 @@ type Workout struct {
 	ID        string     `json:"id,omitempty"`
 	StartedAt time.Time  `json:"started_at"`
 	EndedAt   *time.Time `json:"ended_at,omitempty"`
+	// Date is the workout's local day (StartedAt in Timezone): file it under this day.
+	Date Date `json:"date,omitempty"`
+	// Timezone is the IANA zone the workout happened in.
+	Timezone string `json:"timezone,omitempty"`
 	// UpdatedAt is when the stored record last changed: the workout, an entry, a set or the
 	// program label. Mirror by it.
 	UpdatedAt *time.Time `json:"updated_at,omitempty"`
@@ -100,8 +104,11 @@ type WorkoutProgram struct {
 // WorkoutInput logs a workout (POST /v1/workouts).
 type WorkoutInput struct {
 	StartedAt *time.Time `json:"started_at,omitempty"`
-	// Date is the day in the user's timezone when StartedAt is not given; default today.
-	Date      Date            `json:"date,omitempty"`
+	// Date is the day in the workout's timezone when StartedAt is not given; default today. The
+	// start is then worked out, and listed in Workout.Estimates as /started_at.
+	Date Date `json:"date,omitempty"`
+	// Timezone is the IANA zone the workout happened in; default the person's.
+	Timezone  string          `json:"timezone,omitempty"`
 	Title     string          `json:"title,omitempty"`
 	Notes     string          `json:"notes,omitempty"`
 	Exercises []ExerciseInput `json:"exercises"`
