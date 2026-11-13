@@ -14,21 +14,24 @@ module in `clients/go`). The schema itself is the v0 draft; its own changes are 
 
 Known gaps and deferred work, removed when it ships (and recorded under Unreleased).
 
-- **Go client changes since `clients/go/v0.1.0`** (the workout's local day, #17, and #18's fields)
-  are untagged.
 - **v1:** freezes when the first application outside Lifterclub writes the schema in production;
   after that changes are additive, through RFCs ([README.md](README.md),
   [`schema/CHANGELOG.md`](schema/CHANGELOG.md)).
 
 ## Unreleased
 
-Merged since the last client tags.
+Nothing yet.
+
+## clients/go/v0.2.0 and clients-ts-v0.5.0 — 2026-11-13
+
+Both clients catch up with the schema and the API core: the workout's local day and time zone,
+OWS documents written as they are, and Open Food Log in the TypeScript client. Go v0.2.0 only adds
+fields and `LogDocument`; TypeScript 0.5.0 breaks core-only clients (#18).
 
 ### Added
 
-- **Lifterclub's changes since 2026-11-05, published** (#18): TypeScript client 0.5.0 (on npm,
-  tag `clients-ts-v0.5.0`) with an
-  `/openfoodlog` entry; the API cores take OWS documents as they are; the Go client's
+- **Lifterclub's changes since 2026-11-05, published** (#18): TypeScript client 0.5.0 (on npm)
+  with an `/openfoodlog` entry; the API cores take OWS documents as they are; the Go client's
   `SetInput.Type`, `WorkoutInput.Estimates` and `LogDocument`. **Breaking** for core-only clients
   (mightydotrun/lifterclub#140): writes, deletes and lists lose Lifterclub's own fields (`summary`,
   `new_records`, `warnings`, `totals` and others), and `Problem` loses three codes.
