@@ -662,6 +662,7 @@ components:
       description: "A workout to log. An OWS workout document can be posted as it is: the members the server assigns (id, updated_at, merged_sources, source's kind and client, entries' and sets' id, an exercise's match, a program label's name, day_name and listed) are ignored."
       properties:
         $schema: {const: "https://openworkout.dev/schema/v0/workout.json"}
+        ows_version: {type: string, pattern: '^0\.[0-9]+$', description: "The OWS version the document was written to. Any 0.x is read; members this server doesn't know, and every x- extension member at any level, are ignored (SPEC.md, section 8)."}
         id: {type: string, description: "A stored workout's ID, as an OWS document carries it. Ignored."}
         updated_at: {type: string, format: date-time, description: "Ignored: the server's clock sets it."}
         merged_sources: {type: array, items: {type: object}, description: "Ignored: merges are the server's."}

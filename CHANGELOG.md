@@ -24,6 +24,11 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
   Workouts, routines, programs and logs gain `ows_version`; workouts, entries, sets, routines, rows,
   programs, days and slots allow `x-<vendor>-…` members. The Go client's `Workout` reads
   `ows_version`. Additive ([`schema/CHANGELOG.md`](schema/CHANGELOG.md)).
+- **The specification on the site:** openworkout.dev serves `SPEC.md` at `/schema/v0/spec/`, linked
+  from the schema page, and Markdown tables now render.
+- **Lifterclub's API changes, published:** the API core's `WorkoutInput` names `ows_version`, and
+  `api/v1.yaml`, `api/ofl-core.yaml` and the TypeScript client's types catch up with recipes, saved
+  meals, targets, meal photos and the import sources (no client release yet).
 
 ## clients/go/v0.2.0 and clients-ts-v0.5.0 — 2026-11-13
 

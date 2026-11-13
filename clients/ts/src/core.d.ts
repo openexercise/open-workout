@@ -425,6 +425,8 @@ export interface components {
         WorkoutInput: {
             /** @constant */
             $schema?: "https://openworkout.dev/schema/v0/workout.json";
+            /** @description The OWS version the document was written to. Any 0.x is read; members this server doesn't know, and every x- extension member at any level, are ignored (SPEC.md, section 8). */
+            ows_version?: string;
             /** @description A stored workout's ID, as an OWS document carries it. Ignored. */
             id?: string;
             /**

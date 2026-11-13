@@ -373,6 +373,281 @@ paths:
         "404": {$ref: "#/components/responses/NotFound"}
         "422": {$ref: "#/components/responses/Unprocessable"}
         "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/meals/{id}/copy:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: copyMeal
+      summary: Log a meal again
+      description: |
+        "The same as yesterday's lunch": a new meal with the same items (their words, foods and
+        amounts), each counted again from its food as it is now, on the day or time given (today when
+        none is). An item whose food wasn't confirmed is matched again from its words. Needs
+        health-data consent.
+      tags: [Meals]
+      security: [{oauth2: ['meals:write']}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LogAgainInput"}
+      responses:
+        "201":
+          description: Logged.
+          headers:
+            Location: {schema: {type: string}, description: The new meal's URL.}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MealWritten"}
+        "200":
+          description: An earlier request with the same Idempotency-Key; nothing new was stored.
+          headers:
+            Idempotent-Replayed: {$ref: "#/components/headers/IdempotentReplayed"}
+            Location: {schema: {type: string}, description: The meal's URL.}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MealWritten"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/recipes:
+    get:
+      operationId: listRecipes
+      summary: The user's recipes
+      description: Open Food Log recipes, by name.
+      tags: [Foods]
+      security: [{oauth2: ['meals:read']}]
+      responses:
+        "200":
+          description: The recipes.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/RecipeList"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    post:
+      operationId: createRecipe
+      summary: Make a recipe
+      description: |
+        A food made of other foods (OFL section 8). Each line is matched and weighed as a meal item
+        is, and must name its food surely or give its own nutrients. Its nutrients are its lines'
+        over its yield: `yield_g`, else the lines' grams times `cooking_yield_factor`, else the
+        lines' grams; a nutrient one line lacks is left out. It is then one of the person's foods: a
+        meal item names it by its `id`, by weight or in `serving`s.
+      tags: [Foods]
+      security: [{oauth2: ['meals:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RecipeInput"}
+      responses:
+        "201":
+          description: Made.
+          headers:
+            Location: {schema: {type: string}, description: The recipe's URL.}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Recipe"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/recipes/{id}:
+    parameters:
+      - {name: id, in: path, required: true, description: "The recipe's ID (recipe:…).", schema: {type: string}}
+    get:
+      operationId: getRecipe
+      summary: One recipe
+      tags: [Foods]
+      security: [{oauth2: ['meals:read']}]
+      responses:
+        "200":
+          description: The recipe.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Recipe"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    put:
+      operationId: replaceRecipe
+      summary: Replace a recipe
+      description: Its name, lines and the rest, as POST /v1/recipes takes them; its ID stays, so meals and saved meals naming it still do. Meals already logged keep what they counted.
+      tags: [Foods]
+      security: [{oauth2: ['meals:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/RecipeInput"}
+      responses:
+        "200":
+          description: The recipe after the change.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Recipe"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    delete:
+      operationId: deleteRecipe
+      summary: Delete a recipe
+      description: Meals that logged it keep its name and what they counted; a saved meal naming it is matched from its words when next logged.
+      tags: [Foods]
+      security: [{oauth2: ['meals:write']}]
+      responses:
+        "204": {description: Deleted.}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/saved-meals:
+    get:
+      operationId: listSavedMeals
+      summary: The user's saved meals
+      description: Open Food Log saved meals, by name. Their items' grams and nutrients are left out when the person asked not to see numbers.
+      tags: [Meals]
+      security: [{oauth2: ['meals:read']}]
+      responses:
+        "200":
+          description: The saved meals.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SavedMealList"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    post:
+      operationId: createSavedMeal
+      summary: Save a meal to log again
+      description: |
+        A meal the person keeps to log again ("my usual breakfast"): its items, as POST /v1/meals
+        takes them, or a logged meal's (`from_meal_id`), kept as they were logged. A sentence naming
+        it by name logs its items. Names are one per person. Needs health-data consent.
+      tags: [Meals]
+      security: [{oauth2: ['meals:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SavedMealInput"}
+      responses:
+        "201":
+          description: Saved.
+          headers:
+            Location: {schema: {type: string}, description: The saved meal's URL.}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SavedMeal"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/saved-meals/{id}:
+    parameters:
+      - {name: id, in: path, required: true, description: "The saved meal's ID (saved:…).", schema: {type: string}}
+    get:
+      operationId: getSavedMeal
+      summary: One saved meal
+      tags: [Meals]
+      security: [{oauth2: ['meals:read']}]
+      responses:
+        "200":
+          description: The saved meal.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SavedMeal"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    put:
+      operationId: replaceSavedMeal
+      summary: Replace a saved meal
+      description: Its name, items and the rest, as POST /v1/saved-meals takes them; its ID stays. Needs health-data consent.
+      tags: [Meals]
+      security: [{oauth2: ['meals:write']}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SavedMealInput"}
+      responses:
+        "200":
+          description: The saved meal after the change.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SavedMeal"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+    delete:
+      operationId: deleteSavedMeal
+      summary: Delete a saved meal
+      description: Meals logged from it stay. No consent needed.
+      tags: [Meals]
+      security: [{oauth2: ['meals:write']}]
+      responses:
+        "204": {description: Deleted.}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+  /v1/saved-meals/{id}/log:
+    parameters:
+      - {name: id, in: path, required: true, description: "The saved meal's ID (saved:…).", schema: {type: string}}
+    post:
+      operationId: logSavedMeal
+      summary: Log a saved meal
+      description: |
+        A new meal titled with the saved meal's name, of its type unless another is given, each item
+        counted again from its food as it is now (OFL section 8); an amount the saved meal marks as
+        estimated stays marked. Needs health-data consent.
+      tags: [Meals]
+      security: [{oauth2: ['meals:write']}]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/LogAgainInput"}
+      responses:
+        "201":
+          description: Logged.
+          headers:
+            Location: {schema: {type: string}, description: The new meal's URL.}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MealWritten"}
+        "200":
+          description: An earlier request with the same Idempotency-Key; nothing new was stored.
+          headers:
+            Idempotent-Replayed: {$ref: "#/components/headers/IdempotentReplayed"}
+            Location: {schema: {type: string}, description: The meal's URL.}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MealWritten"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {$ref: "#/components/responses/Unprocessable"}
+        "429": {$ref: "#/components/responses/RateLimited"}
   /v1/meal-items/{id}:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -524,7 +799,7 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "503":
-          description: "`internal_error`: a barcode couldn't be looked up just now. `Retry-After` says when to try again."
+          description: "`barcode_unavailable`: a barcode couldn't be looked up just now. `Retry-After` says when to try again."
           headers:
             Retry-After: {schema: {type: integer}}
           content:
@@ -603,7 +878,7 @@ components:
         status: {type: integer}
         detail: {type: string}
         code:
-          enum: [invalid_input, consent_required, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
+          enum: [invalid_input, consent_required, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error, barcode_unavailable]
         field: {type: string, description: For invalid_input.}
     BearerError:
       type: object
@@ -657,6 +932,14 @@ components:
           description: The person's own foods that the meals name, so a reader elsewhere can resolve them.
           type: array
           items: {$ref: "#/components/schemas/Food"}
+        recipes:
+          description: The person's recipes, which the meals and saved meals may name.
+          type: array
+          items: {$ref: "#/components/schemas/Recipe"}
+        saved_meals:
+          description: Meals the person keeps to log again (OFL v0.2).
+          type: array
+          items: {$ref: "#/components/schemas/SavedMeal"}
         deleted_meals:
           description: Meals the person deleted, newest first, for a server that keeps them.
           type: array
@@ -674,6 +957,115 @@ components:
         value: {type: number, exclusiveMinimum: 0}
         unit: {type: string, enum: [g, kg, oz, lb, ml, l, fl_oz, portion, serving]}
         portion: {type: string, description: With unit portion, the id of one of the food's portions.: ''}
+    LogAgainInput:
+      description: When a meal logged again was eaten, all optional; today when nothing is given.
+      type: object
+      properties:
+        date: {type: string, format: date, description: "The user's local day."}
+        eaten_at: {type: string, format: date-time}
+        timezone: {type: string, description: The IANA zone the person ate in.}
+        meal_type: {type: string, enum: [breakfast, lunch, dinner, snack], description: "The meal's type; the one it had when left out."}
+    FoodLine:
+      description: An ingredient of a recipe, or an item of a saved meal, shaped like an Open Food Log meal item without an ID.
+      type: object
+      required: [text, food]
+      properties:
+        text: {type: string}
+        food:
+          type: object
+          required: [id, name, match]
+          properties:
+            id: {type: [string, "null"]}
+            name: {type: string}
+            match: {type: string, enum: [catalogue, close, custom, unmatched, none]}
+        amount: {$ref: "#/components/schemas/FoodAmount"}
+        share: {type: number, exclusiveMinimum: 0, maximum: 1}
+        grams: {type: number, minimum: 0}
+        nutrients: {$ref: "#/components/schemas/FoodNutrients"}
+        notes: {type: string}
+    RecipeInput:
+      type: object
+      required: [name, lines, servings]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        lines: {type: array, minItems: 1, maxItems: 50, items: {$ref: "#/components/schemas/MealItemInput"}, description: "The ingredients, raw as they go in, each as a meal item."}
+        servings: {type: number, exclusiveMinimum: 0, maximum: 1000, description: How many servings the whole makes.}
+        yield_g: {type: number, exclusiveMinimum: 0, maximum: 100000, description: "What the whole weighs made. Needed when a line has no weight (a volume of a food with no density)."}
+        cooking_yield_factor: {type: number, exclusiveMinimum: 0, maximum: 5, description: "Made weight over raw weight (0.75 for a roast that loses a quarter), used when yield_g is absent."}
+        instructions: {type: string, maxLength: 10000}
+        notes: {type: string, maxLength: 2000}
+    Recipe:
+      description: An Open Food Log v0.2 recipe (https://openfoodlog.org/schema/v0/recipe.json).
+      type: object
+      required: [$schema, ofl_version, id, name, lines, servings, nutrients_per_100g, nutrients_per_serving, source, updated_at]
+      properties:
+        $schema: {type: string, const: "https://openfoodlog.org/schema/v0/recipe.json"}
+        ofl_version: {type: string}
+        id: {type: string, description: "recipe:…, the food_id a meal item names it by."}
+        name: {type: string}
+        notes: {type: string}
+        instructions: {type: string}
+        lines: {type: array, items: {$ref: "#/components/schemas/FoodLine"}}
+        servings: {type: number}
+        yield_g: {type: number}
+        cooking_yield_factor: {type: number}
+        nutrients_per_100g: {$ref: "#/components/schemas/FoodNutrients"}
+        nutrients_per_serving: {$ref: "#/components/schemas/FoodNutrients"}
+        source:
+          type: object
+          required: [kind, external_id]
+          properties:
+            kind: {type: string, enum: [app, mcp, api, import]}
+            client: {type: string}
+            external_id: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+    RecipeList:
+      type: object
+      required: [recipes]
+      properties:
+        recipes: {type: array, items: {$ref: "#/components/schemas/Recipe"}}
+    SavedMealInput:
+      description: Give items, or from_meal_id, not both.
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120, description: "What the person calls it (\"usual breakfast\"); a sentence naming it logs it."}
+        meal_type: {type: string, enum: [breakfast, lunch, dinner, snack], description: "The type to log it as; with from_meal_id, that meal's when left out."}
+        label: {type: string, minLength: 1, maxLength: 80}
+        notes: {type: string, maxLength: 2000}
+        items: {type: array, minItems: 1, maxItems: 50, items: {$ref: "#/components/schemas/MealItemInput"}}
+        estimates:
+          type: array
+          description: "As on POST /v1/meals: items whose amount the person didn't give."
+          items: {type: string, pattern: "^/items/[0-9]+/(amount|grams|nutrients)$"}
+        from_meal_id: {type: string, format: uuid, description: "A logged meal to save, its items as they were logged."}
+    SavedMeal:
+      description: An Open Food Log v0.2 saved meal (https://openfoodlog.org/schema/v0/saved-meal.json).
+      type: object
+      required: [$schema, ofl_version, id, name, items, source, updated_at, estimates]
+      properties:
+        $schema: {type: string, const: "https://openfoodlog.org/schema/v0/saved-meal.json"}
+        ofl_version: {type: string, description: "0.2: saved meals arrived then."}
+        id: {type: string, description: "saved:…"}
+        name: {type: string}
+        meal_type: {type: string, enum: [breakfast, lunch, dinner, snack]}
+        label: {type: string}
+        notes: {type: string}
+        items: {type: array, items: {$ref: "#/components/schemas/FoodLine"}, description: "grams and nutrients are what each counted when saved, a preview; logging counts again."}
+        source:
+          type: object
+          required: [kind, external_id]
+          properties:
+            kind: {type: string, enum: [app, mcp, api, import]}
+            client: {type: string}
+            external_id: {type: [string, "null"]}
+        updated_at: {type: string, format: date-time}
+        estimates: {type: array, items: {type: string}}
+    SavedMealList:
+      type: object
+      required: [saved_meals]
+      properties:
+        saved_meals: {type: array, items: {$ref: "#/components/schemas/SavedMeal"}}
     MealItemInput:
       type: object
       required: [text]
@@ -740,12 +1132,12 @@ components:
         confidence: {type: [number, "null"], minimum: 0, maximum: 1}
         notes: {type: [string, "null"]}
     Meal:
-      description: An Open Food Log v0.1 meal (https://openfoodlog.org/schema/v0/meal.json).
+      description: An Open Food Log v0.2 meal (https://openfoodlog.org/schema/v0/meal.json).
       type: object
       required: [$schema, ofl_version, id, date, logged_at, updated_at, source, items, estimates]
       properties:
         $schema: {type: string, const: "https://openfoodlog.org/schema/v0/meal.json"}
-        ofl_version: {type: string, description: "The Open Food Log version, as MAJOR.MINOR: 0.1."}
+        ofl_version: {type: string, description: "The Open Food Log version, as MAJOR.MINOR: 0.2."}
         id: {type: string, format: uuid}
         eaten_at: {type: string, format: date-time}
         date: {type: string, format: date}
@@ -895,7 +1287,7 @@ components:
       required: [$schema, ofl_version, targets]
       properties:
         $schema: {type: string, const: "https://openfoodlog.org/schema/v0/targets.json"}
-        ofl_version: {type: string, const: "0.1"}
+        ofl_version: {type: string, const: "0.2"}
         updated_at: {type: string, format: date-time}
         targets: {type: array, items: {$ref: "#/components/schemas/Target"}}
     TargetsInput:
@@ -1024,11 +1416,11 @@ components:
         grams: {type: number, exclusiveMinimum: 0, maximum: 5000}
         is_default: {type: boolean, description: The amount to assume when a person names the food without one. At most one.}
     Food:
-      description: An Open Food Log v0.1 food (https://openfoodlog.org/schema/v0/food.json).
+      description: An Open Food Log v0.2 food (https://openfoodlog.org/schema/v0/food.json).
       type: object
       required: [id, name, kind, nutrients_per_100g]
       properties:
-        ofl_version: {type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.1."}
+        ofl_version: {type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.2."}
         id: {type: string}
         name: {type: string}
         kind: {type: string, enum: [generic, branded, custom], description: "branded: a packaged product."}

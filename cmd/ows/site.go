@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
 )
 
 //go:embed templates/*.html templates/style.css
@@ -154,15 +155,17 @@ func buildSite(root, out string) error {
 	if err := render("mcp", "mcp.html", page{Title: "MCP tool profile", Description: "The tools an assistant uses over an Open Workout log, as the reference server lists them.", Profile: &prof}); err != nil {
 		return err
 	}
-	for name, path := range map[string]string{"changelog": filepath.Join(root, "schema", "CHANGELOG.md"), "mcp/profile": filepath.Join(root, "mcp", "README.md")} {
+	titles := map[string]string{"changelog": "Changelog", "mcp/profile": "What a compatible server keeps to", "schema/v0/spec": "Open Workout Schema v0 specification"}
+	for name, path := range map[string]string{"changelog": filepath.Join(root, "schema", "CHANGELOG.md"), "mcp/profile": filepath.Join(root, "mcp", "README.md"), "schema/v0/spec": filepath.Join(root, "schema", "v0", "SPEC.md")} {
 		html, err := renderMarkdown(path)
 		if err != nil {
 			return err
 		}
-		title := "Changelog"
-		if name == "mcp/profile" {
-			title = "What a compatible server keeps to"
+		if name == "schema/v0/spec" {
+			// SPEC.md links its neighbours relatively, as GitHub shows it; on the site they live elsewhere.
+			html = template.HTML(specLinks.Replace(string(html)))
 		}
+		title := titles[name]
 		if err := render(name, "doc.html", page{Title: title, Description: title + ".", HTML: html}); err != nil {
 			return err
 		}
@@ -328,13 +331,24 @@ var (
 	repoLinks = regexp.MustCompile(`href="\.\./([^"]*)"`)
 )
 
+// specLinks moves SPEC.md's relative links to where the site serves those files.
+var specLinks = strings.NewReplacer(
+	`href="workout.json"`, `href="/schema/v0/workout.json"`,
+	`href="routine.json"`, `href="/schema/v0/routine.json"`,
+	`href="program.json"`, `href="/schema/v0/program.json"`,
+	`href="log.json"`, `href="/schema/v0/log.json"`,
+	`href="progression-vectors.json"`, `href="/schema/v0/progression-vectors.json"`,
+	`href="webhook-signature-vectors.json"`, `href="/schema/v0/webhook-signature-vectors.json"`,
+	`href="../CHANGELOG.md"`, `href="/changelog/"`,
+)
+
 func renderMarkdown(path string) (template.HTML, error) {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
 	var b bytes.Buffer
-	if err := goldmark.New().Convert(src, &b); err != nil {
+	if err := goldmark.New(goldmark.WithExtensions(extension.Table)).Convert(src, &b); err != nil {
 		return "", fmt.Errorf("render %s: %w", path, err)
 	}
 	return template.HTML(b.String()), nil // our own file in this repository
