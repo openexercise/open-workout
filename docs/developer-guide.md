@@ -406,14 +406,16 @@ instead; see section 17.
 
 ## 13. Validating documents
 
-From a checkout of this repository:
+From a checkout of this repository, or anywhere with the installed command
+(`go install github.com/openexercise/open-workout/cmd/ows@latest`):
 
 ```bash
 go run ./cmd/ows validate                      # everything under examples/
 go run ./cmd/ows validate path/to/workout.json # files or directories
 ```
 
-A document names its schema in `$schema`; without one it is checked as a workout. A valid run
+A document names its schema in `$schema`: a workout, routine, program or log. Without one it is
+checked as a workout. The schemas are built into the command, so it needs no checkout. A valid run
 prints `N document(s) valid`. An invalid one says where and why, and exits 1:
 
 ```
@@ -424,13 +426,8 @@ bad.json: jsonschema validation failed with 'https://openworkout.dev/schema/v0/w
 1 problem(s) in 1 document(s)
 ```
 
-Current limits of `ows validate`:
-
-- It knows the workout and program schemas only. A document whose `$schema` is `log.json` or
-  `routine.json` is reported as an unknown `$schema`. Until that's fixed, validate logs and
-  routines with any JSON Schema 2020-12 validator, loading the schemas from `schema/v0` or their
-  `$id` URLs.
-- It reads the schemas from `schema/v0` in the current directory, so run it from a checkout.
+`examples/` holds one of each: `push-day.json` and `lower-day.json` (workouts),
+`push-routine.json`, `two-day-linear.json` (a program) and `log.json`.
 
 In Go, the `conformance` package validates the documents a server returns. The schemas are also
 embedded in the module root as `openworkout.Schemas` (package `github.com/openexercise/open-workout`),
@@ -511,8 +508,9 @@ What a write accepts:
 - An OWS workout document as it is. The members the server assigns (`id`, `updated_at`,
   `merged_sources`, `source.kind` and `client`, entry and set `id`s, `match`) are ignored.
 
-The template server doesn't take all of this yet: it refuses `$schema`, `timezone` and a load as
-`{value, unit}` with `invalid_input`, though the API core asks for all of it.
+A document's `exercise.id` is a sure match only when its `match` is `catalogue` (or missing) and
+the server knows the ID; otherwise the server matches the entry's `text`, as it would a name. The
+`document` conformance check posts a document like this.
 
 Retries:
 
@@ -694,7 +692,8 @@ PASS discovery
 PASS create
 ...
 PASS webhooks
-12 checks: 12 passed, 0 failed, 0 skipped
+PASS document
+13 checks: 13 passed, 0 failed, 0 skipped
 
 PASS discovery
 PASS tools
@@ -832,8 +831,7 @@ func main() {
 }
 ```
 
-`c.LogDocument(ctx, workout)` posts an OWS `Workout` as it is (not to the template server yet; see
-section 14). Errors are `*openworkout.Error`;
+`c.LogDocument(ctx, workout)` posts an OWS `Workout` as it is. Errors are `*openworkout.Error`;
 `openworkout.HasCode(err, openworkout.CodeRateLimited)` tests the code.
 
 TypeScript (`npm install @openexercise/open-workout-client`), as an ES module on Node, against the

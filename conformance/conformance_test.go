@@ -25,7 +25,7 @@ type reference struct {
 	hooks     map[string]bool
 
 	noChallenge, noReplay, noExternalReplay, revives, loseNotes, badExport bool
-	noFeed, noTombstones, listsSecret                                      bool
+	noFeed, noTombstones, listsSecret, refusesDocuments                    bool
 }
 
 func newReference() *reference {
@@ -86,8 +86,15 @@ func (s *reference) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *reference) create(w http.ResponseWriter, r *http.Request) {
 	var in map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&in)
+	if _, isDocument := in["$schema"]; isDocument && s.refusesDocuments {
+		problem(w, http.StatusBadRequest, "invalid_input")
+		return
+	}
 	key := r.Header.Get("Idempotency-Key")
 	ext, _ := in["external_id"].(string)
+	if source, ok := in["source"].(map[string]any); ok && ext == "" {
+		ext, _ = source["external_id"].(string)
+	}
 	_, seenKey := s.keys[key]
 	if id, ok := s.keys[key]; ok && !s.noReplay {
 		s.replay(w, id)
@@ -112,14 +119,25 @@ func (s *reference) create(w http.ResponseWriter, r *http.Request) {
 		for _, st := range e["sets"].([]any) {
 			st := st.(map[string]any)
 			set := map[string]any{"reps": st["reps"]}
-			if st["load"] != nil {
-				set["load"] = map[string]any{"value": st["load"], "unit": st["unit"]}
+			switch load := st["load"].(type) {
+			case map[string]any:
+				set["load"] = map[string]any{"value": load["value"], "unit": load["unit"]}
+			case nil:
+			default:
+				set["load"] = map[string]any{"value": load, "unit": st["unit"]}
+			}
+			if st["type"] != nil {
+				set["type"] = st["type"]
 			}
 			sets = append(sets, set)
 		}
+		name := e["name"]
+		if name == nil {
+			name = e["text"]
+		}
 		entries = append(entries, map[string]any{
-			"exercise": map[string]any{"id": nil, "name": e["name"], "match": "unmatched"},
-			"text":     e["name"], "sets": sets,
+			"exercise": map[string]any{"id": nil, "name": name, "match": "unmatched"},
+			"text":     name, "sets": sets,
 		})
 	}
 	wk := map[string]any{
@@ -128,6 +146,14 @@ func (s *reference) create(w http.ResponseWriter, r *http.Request) {
 		"updated_at": time.Now().UTC().Format(time.RFC3339Nano),
 		"source":     map[string]any{"kind": "api", "client": "test", "external_id": ext},
 		"exercises":  entries, "estimates": []any{},
+	}
+	if wk["notes"] == nil {
+		delete(wk, "notes")
+	}
+	if tz, ok := in["timezone"].(string); ok {
+		loc, _ := time.LoadLocation(tz)
+		started, _ := time.Parse(time.RFC3339, fmt.Sprint(in["started_at"]))
+		wk["timezone"], wk["date"] = tz, started.In(loc).Format(time.DateOnly)
 	}
 	s.byID[id], s.keys[key] = wk, id
 	if _, ok := s.external[ext]; !ok {
@@ -262,6 +288,7 @@ func TestEachCheckCatchesItsBehaviour(t *testing.T) {
 		{"no change feed", func(s *reference) { s.noFeed = true }, []string{"change-feed", "tombstone"}},
 		{"no tombstones", func(s *reference) { s.noTombstones = true }, []string{"tombstone"}},
 		{"secret listed", func(s *reference) { s.listsSecret = true }, []string{"webhooks"}},
+		{"documents refused", func(s *reference) { s.refusesDocuments = true }, []string{"document"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -308,7 +335,7 @@ func TestCreateFailureSkipsTheRest(t *testing.T) {
 	}
 	for _, name := range Checks[2:] {
 		want := Skip
-		if name == "webhooks" { // needs no workout, so it runs, and fails here like everything else
+		if name == "webhooks" || name == "document" { // need no workout, so they run, and fail here like everything else
 			want = Fail
 		}
 		if got[name] != want {

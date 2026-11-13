@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -52,7 +55,7 @@ type Entry struct {
 	Notes    string      `json:"notes,omitempty"`
 	Sets     []*Set      `json:"sets"`
 
-	candidates []*CatalogueExercise
+	candidates []scored
 }
 
 func (e *Entry) confirmedID() string {
@@ -82,9 +85,28 @@ type Workout struct {
 	Source    Source     `json:"source"`
 	Exercises []*Entry   `json:"exercises"`
 	Estimates []string   `json:"estimates"`
+	// Date is the workout's local day in Timezone; both are worked out when it's read.
+	Date     string `json:"date,omitempty"`
+	Timezone string `json:"timezone,omitempty"`
+
+	// loc is the zone the workout happened in: the one it was logged with, else the server's.
+	loc *time.Location
+	// startEstimated says the start was worked out from a day, not given.
+	startEstimated bool
+}
+
+// zone is the zone a workout happened in.
+func (l *personLog) zone(w *Workout) *time.Location {
+	if w.loc != nil {
+		return w.loc
+	}
+	return l.s.loc
 }
 
 const workoutSchema = "https://openworkout.dev/schema/v0/workout.json"
+
+// zoneName is the schema's pattern for timezone: an IANA name, not the process's "Local".
+var zoneName = regexp.MustCompile(`^(UTC|[A-Za-z]+(/[A-Za-z0-9_+-]+)+)$`)
 
 // view is a copy of the workout for a result, with its estimates as JSON pointers worked out
 // now, since positions shift as entries and sets come and go.
@@ -92,6 +114,15 @@ func (w *Workout) view() Workout {
 	out := *w
 	out.Exercises = make([]*Entry, len(w.Exercises))
 	out.Estimates = []string{}
+	if w.startEstimated {
+		out.Estimates = append(out.Estimates, "/started_at")
+	}
+	if w.loc != nil {
+		out.Date = w.StartedAt.In(w.loc).Format(time.DateOnly)
+		if zoneName.MatchString(w.loc.String()) {
+			out.Timezone = w.loc.String()
+		}
+	}
 	for i, e := range w.Exercises {
 		ce := *e
 		ce.Sets = make([]*Set, len(e.Sets))
@@ -253,28 +284,74 @@ func notFound() error {
 // --- Writing ---
 
 // SetInput is a set as the tools take it.
+// LoadInput is a set's load as a client sends it: a number with unit beside it, or an OWS load
+// {value, unit}.
+type LoadInput struct {
+	Value float64
+	Unit  string
+}
+
+func (in *LoadInput) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &in.Value); err == nil {
+		return nil
+	}
+	var ld struct {
+		Value *float64 `json:"value"`
+		Unit  string   `json:"unit"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&ld); err != nil || ld.Value == nil {
+		return errors.New("load is a number, or {value, unit}")
+	}
+	in.Value, in.Unit = *ld.Value, ld.Unit
+	return nil
+}
+
+// SetInput is a set to log: as a client describes it, or as an OWS workout document has it
+// (its id is ignored).
 type SetInput struct {
-	Reps         *int     `json:"reps"`
-	Load         *float64 `json:"load"`
-	Unit         string   `json:"unit"`
-	RPE          *float64 `json:"rpe"`
-	DurationS    *int     `json:"duration_s"`
-	DistanceM    *float64 `json:"distance_m"`
-	Calories     *int     `json:"calories"`
-	HeartRateBPM *int     `json:"heart_rate_bpm"`
-	Warmup       bool     `json:"warmup"`
-	Estimated    bool     `json:"estimated"`
+	ID           string     `json:"id"`
+	Type         string     `json:"type"`
+	Reps         *int       `json:"reps"`
+	Load         *LoadInput `json:"load"`
+	Unit         string     `json:"unit"`
+	RPE          *float64   `json:"rpe"`
+	DurationS    *int       `json:"duration_s"`
+	DistanceM    *float64   `json:"distance_m"`
+	Calories     *int       `json:"calories"`
+	HeartRateBPM *int       `json:"heart_rate_bpm"`
+	Warmup       bool       `json:"warmup"`
+	Estimated    bool       `json:"estimated"`
 }
 
 func (l *personLog) newSet(field string, in SetInput) (*Set, error) {
 	if in.Reps == nil && in.Load == nil && in.DurationS == nil && in.DistanceM == nil {
 		return nil, invalid(field, "give reps, load, duration_s or distance_m")
 	}
-	if err := checkNumbers(field, in.Reps, in.Load, in.RPE, in.DurationS, in.DistanceM, in.Calories, in.HeartRateBPM); err != nil {
+	var load *float64
+	if in.Load != nil {
+		load = &in.Load.Value
+		if in.Load.Unit != "" {
+			if in.Unit != "" && in.Unit != in.Load.Unit {
+				return nil, invalid(field+".unit", "differs from load.unit; give one")
+			}
+			in.Unit = in.Load.Unit
+		}
+	}
+	if err := checkNumbers(field, in.Reps, load, in.RPE, in.DurationS, in.DistanceM, in.Calories, in.HeartRateBPM); err != nil {
 		return nil, err
+	}
+	switch in.Type {
+	case "", "working", "warmup", "backoff", "amrap", "failure", "drop":
+	default:
+		return nil, invalid(field+".type", "use working, warmup, backoff, amrap, failure or drop")
 	}
 	st := &Set{ID: newID("st_"), Reps: in.Reps, RPE: in.RPE, DurationS: in.DurationS, DistanceM: in.DistanceM,
 		Calories: in.Calories, HeartRateBPM: in.HeartRateBPM, Estimated: in.Estimated}
+	if in.Type != "working" {
+		st.Type = in.Type
+	}
 	if in.Warmup {
 		st.Type = "warmup"
 	}
@@ -283,7 +360,7 @@ func (l *personLog) newSet(field string, in SetInput) (*Set, error) {
 		if err != nil {
 			return nil, err
 		}
-		st.Load = &Load{Value: *in.Load, Unit: unit}
+		st.Load = &Load{Value: in.Load.Value, Unit: unit}
 		st.UnitAssumed = assumed
 	}
 	return st, nil
@@ -337,7 +414,7 @@ func (l *personLog) newEntry(field, name, exerciseID string) (*Entry, error) {
 	case exact != nil:
 		e.Exercise = ExerciseRef{ID: &exact.ID, Name: exact.Name, Match: "catalogue"}
 	case len(candidates) > 0:
-		e.Exercise = ExerciseRef{ID: &candidates[0].ID, Name: candidates[0].Name, Match: "close"}
+		e.Exercise = ExerciseRef{ID: &candidates[0].exercise.ID, Name: candidates[0].exercise.Name, Match: "close"}
 		e.candidates = candidates
 	default:
 		e.Exercise = ExerciseRef{Name: name, Match: "unmatched"}
@@ -346,11 +423,49 @@ func (l *personLog) newEntry(field, name, exerciseID string) (*Entry, error) {
 }
 
 // ExerciseInput is one exercise of log_workout.
+// An OWS entry's exercise, its text and its id are read too: exercise.id as exercise_id, text
+// (else exercise.name) as name; match and id are the server's.
 type ExerciseInput struct {
 	Name       string     `json:"name"`
 	ExerciseID string     `json:"exercise_id"`
 	Notes      string     `json:"notes"`
 	Sets       []SetInput `json:"sets"`
+
+	ID       string `json:"id"`
+	Text     string `json:"text"`
+	Exercise *struct {
+		ID    *string `json:"id"`
+		Name  string  `json:"name"`
+		Match string  `json:"match"`
+	} `json:"exercise"`
+}
+
+// nameAndID is what the entry names: name and exercise_id, or an OWS entry's text and exercise.
+// A document's exercise.id is taken as sure only when its match is catalogue (or not given) and
+// this server knows the ID, as when importing another app's log; else the name is matched.
+func (ex ExerciseInput) nameAndID(field string, c *Catalogue) (string, string, error) {
+	name, id := ex.Name, ex.ExerciseID
+	if name == "" {
+		name = ex.Text
+	}
+	if ex.Exercise == nil {
+		return name, id, nil
+	}
+	if name == "" {
+		name = ex.Exercise.Name
+	}
+	docID := ""
+	if ex.Exercise.ID != nil {
+		docID = *ex.Exercise.ID
+	}
+	sure := docID != "" && (ex.Exercise.Match == "" || ex.Exercise.Match == "catalogue") && c.ByID(docID) != nil
+	switch {
+	case id != "" && docID != "" && id != docID:
+		return "", "", invalid(field+".exercise_id", "differs from exercise.id; give one")
+	case id == "" && sure:
+		id = docID
+	}
+	return name, id, nil
 }
 
 // LogWorkoutInput is log_workout's arguments, and POST /v1/workouts' body with started_at and
@@ -364,6 +479,18 @@ type LogWorkoutInput struct {
 	Exercises      []ExerciseInput `json:"exercises"`
 	Program        json.RawMessage `json:"program"`
 	IdempotencyKey string          `json:"idempotency_key"`
+
+	// An OWS workout document can be posted as it is (REST only): timezone and estimates are
+	// read, source.external_id is external_id, and what the server assigns is ignored.
+	Timezone      string          `json:"timezone"`
+	Estimates     []string        `json:"estimates"`
+	Source        *Source         `json:"source"`
+	Schema        string          `json:"$schema"`
+	OWSVersion    string          `json:"ows_version"`
+	ID            string          `json:"id"`
+	UpdatedAt     string          `json:"updated_at"`
+	EndedAt       string          `json:"ended_at"`
+	MergedSources json.RawMessage `json:"merged_sources"`
 }
 
 // LogWorkout stores a whole workout. kind is the source: mcp or api. A workout whose external_id
@@ -371,6 +498,9 @@ type LogWorkoutInput struct {
 func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result, error) {
 	if len(in.Program) > 0 {
 		return nil, invalid("program", "this server doesn't offer programs; leave it out")
+	}
+	if err := in.checkDocument(); err != nil {
+		return nil, err
 	}
 	if id, ok := l.external[in.ExternalID]; ok && in.ExternalID != "" {
 		_, w, _, _ := l.find(id)
@@ -384,10 +514,24 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result,
 	if len(in.Exercises) == 0 {
 		return nil, invalid("exercises", "give at least one exercise")
 	}
-	started, err := l.startOf(in.Date)
+	loc := l.s.loc
+	if in.Timezone != "" {
+		var err error
+		if loc, err = time.LoadLocation(in.Timezone); err != nil || !zoneName.MatchString(in.Timezone) {
+			return nil, invalid("timezone", "use an IANA time zone, e.g. America/Chicago")
+		}
+	}
+	marks, err := readEstimates(in.Estimates, in.Exercises)
 	if err != nil {
 		return nil, err
 	}
+	started, err := l.startIn(in.Date, loc)
+	if err != nil {
+		return nil, err
+	}
+	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), Title: in.Title, Notes: in.Notes,
+		Source: Source{Kind: kind, Client: client, ExternalID: in.ExternalID}, loc: loc,
+		startEstimated: in.StartedAt == "" && in.Date != "" || marks.start}
 	if in.StartedAt != "" {
 		if started, err = time.Parse(time.RFC3339, in.StartedAt); err != nil {
 			return nil, invalid("started_at", "use RFC 3339, e.g. 2026-10-28T17:45:00-05:00")
@@ -395,12 +539,28 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result,
 		if started.After(l.s.now().Add(5 * time.Minute)) {
 			return nil, invalid("started_at", "that hasn't happened yet")
 		}
+		if in.Date != "" && started.In(loc).Format(time.DateOnly) != in.Date {
+			return nil, invalid("date", "isn't started_at's day in timezone; leave it out")
+		}
 	}
-	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), StartedAt: started, Title: in.Title, Notes: in.Notes,
-		Source: Source{Kind: kind, Client: client, ExternalID: in.ExternalID}}
+	w.StartedAt = started.In(loc)
+	if in.EndedAt != "" {
+		ended, err := time.Parse(time.RFC3339, in.EndedAt)
+		if err != nil {
+			return nil, invalid("ended_at", "use RFC 3339, e.g. 2026-10-28T18:45:00-05:00")
+		}
+		if ended.Before(started) || ended.After(l.s.now().Add(5*time.Minute)) {
+			return nil, invalid("ended_at", "must be after the workout started and not in the future")
+		}
+		w.EndedAt = &ended
+	}
 	for i, ex := range in.Exercises {
 		field := fmt.Sprintf("exercises[%d]", i)
-		e, err := l.newEntry(field, ex.Name, ex.ExerciseID)
+		name, exerciseID, err := ex.nameAndID(field, l.s.catalogue)
+		if err != nil {
+			return nil, err
+		}
+		e, err := l.newEntry(field, name, exerciseID)
 		if err != nil {
 			return nil, err
 		}
@@ -412,6 +572,10 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result,
 			st, err := l.newSet(fmt.Sprintf("%s.sets[%d]", field, j), si)
 			if err != nil {
 				return nil, err
+			}
+			st.Estimated = st.Estimated || marks.sets[[2]int{i, j}]
+			if marks.units[[2]int{i, j}] && st.Load != nil {
+				st.UnitAssumed = true
 			}
 			e.Sets = append(e.Sets, st)
 		}
@@ -427,13 +591,74 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result,
 	return l.logged(w, "Logged", before), nil
 }
 
-// startOf is when a workout on a day started: now for today, else midday that day.
+// checkDocument checks the members of an OWS document that this server reads or refuses.
+func (in *LogWorkoutInput) checkDocument() error {
+	if in.Schema != "" && in.Schema != workoutSchema {
+		return invalid("$schema", "post a workout document (%s)", workoutSchema)
+	}
+	if in.OWSVersion != "" && !owsVersion.MatchString(in.OWSVersion) {
+		return invalid("ows_version", "this server reads OWS 0.x")
+	}
+	if in.Source != nil && in.Source.ExternalID != "" {
+		if in.ExternalID != "" && in.ExternalID != in.Source.ExternalID {
+			return invalid("external_id", "differs from source.external_id; give one")
+		}
+		in.ExternalID = in.Source.ExternalID
+	}
+	return nil
+}
+
+var owsVersion = regexp.MustCompile(`^0\.[0-9]+$`)
+
+// estimateMarks are a body's estimates, read as what they mark.
+type estimateMarks struct {
+	start bool
+	sets  map[[2]int]bool // a set, or a value in one
+	units map[[2]int]bool // a set's /load/unit
+}
+
+// readEstimates reads JSON pointers into the posted body: /started_at, a set or a value in one
+// (the set is marked), or a set's /load/unit (the unit was assumed).
+func readEstimates(pointers []string, exercises []ExerciseInput) (estimateMarks, error) {
+	m := estimateMarks{sets: map[[2]int]bool{}, units: map[[2]int]bool{}}
+	for k, p := range pointers {
+		field := fmt.Sprintf("estimates[%d]", k)
+		if p == "/started_at" {
+			m.start = true
+			continue
+		}
+		var i, j int
+		var rest string
+		if n, _ := fmt.Sscanf(p, "/exercises/%d/sets/%d%s", &i, &j, &rest); n < 2 ||
+			p != fmt.Sprintf("/exercises/%d/sets/%d%s", i, j, rest) {
+			return m, invalid(field, "point at /started_at, a set, or a value in one")
+		}
+		if i < 0 || i >= len(exercises) || j < 0 || j >= len(exercises[i].Sets) {
+			return m, invalid(field, "points past the sets in this body")
+		}
+		key := [2]int{i, j}
+		switch rest {
+		case "/load/unit":
+			m.units[key] = true
+		default:
+			m.sets[key] = true
+		}
+	}
+	return m, nil
+}
+
+// startOf is when a workout on a day started, in the server's zone.
 func (l *personLog) startOf(date string) (time.Time, error) {
-	now := l.s.now().In(l.s.loc)
+	return l.startIn(date, l.s.loc)
+}
+
+// startIn is when a workout on a day in a zone started: now for today, else midday that day.
+func (l *personLog) startIn(date string, loc *time.Location) (time.Time, error) {
+	now := l.s.now().In(loc)
 	if date == "" {
 		return now, nil
 	}
-	day, err := time.ParseInLocation(time.DateOnly, date, l.s.loc)
+	day, err := time.ParseInLocation(time.DateOnly, date, loc)
 	if err != nil {
 		return time.Time{}, invalid("date", "use YYYY-MM-DD")
 	}
@@ -535,7 +760,7 @@ func (l *personLog) workoutForSets(id, kind, client string) (*Workout, error) {
 	if current != nil {
 		return current, nil
 	}
-	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), StartedAt: now.In(l.s.loc), Source: Source{Kind: kind, Client: client}}
+	w := &Workout{Schema: workoutSchema, ID: newID("wk_"), StartedAt: now.In(l.s.loc), Source: Source{Kind: kind, Client: client}, loc: l.s.loc}
 	l.workouts = append(l.workouts, w)
 	return w, nil
 }
@@ -627,12 +852,13 @@ func (l *personLog) Update(in UpdateInput) (Result, error) {
 
 func (l *personLog) updateWorkout(w *Workout, in UpdateInput) error {
 	if in.Date != nil {
-		day, err := l.startOf(*in.Date)
+		loc := l.zone(w)
+		day, err := l.startIn(*in.Date, loc)
 		if err != nil {
 			return err
 		}
-		clock := w.StartedAt.In(l.s.loc)
-		started := time.Date(day.Year(), day.Month(), day.Day(), clock.Hour(), clock.Minute(), clock.Second(), 0, l.s.loc)
+		clock := w.StartedAt.In(loc)
+		started := time.Date(day.Year(), day.Month(), day.Day(), clock.Hour(), clock.Minute(), clock.Second(), 0, loc)
 		if w.EndedAt != nil {
 			ended := w.EndedAt.Add(started.Sub(w.StartedAt))
 			w.EndedAt = &ended
@@ -841,8 +1067,11 @@ type Confirmation struct {
 
 // Candidate is an exercise an unconfirmed entry may be.
 type Candidate struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	MeasurementType string  `json:"measurement_type"`
+	IsCustom        bool    `json:"is_custom"`
+	Score           float64 `json:"score"`
 }
 
 // Logged is the result of a write that leaves a workout: the workout, a summary to echo,
@@ -868,8 +1097,9 @@ func (l *personLog) logged(w *Workout, verb string, before map[recordKey]Record)
 			continue
 		}
 		c := Confirmation{EntryID: e.ID, Text: e.Text, Status: e.Exercise.Match, Candidates: []Candidate{}}
-		for _, ex := range e.candidates {
-			c.Candidates = append(c.Candidates, Candidate{ex.ID, ex.Name})
+		for _, s := range e.candidates {
+			c.Candidates = append(c.Candidates, Candidate{ID: s.exercise.ID, Name: s.exercise.Name,
+				MeasurementType: s.exercise.MeasurementType, Score: round1(s.score)})
 		}
 		out.NeedsConfirmation = append(out.NeedsConfirmation, c)
 	}

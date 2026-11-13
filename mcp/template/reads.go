@@ -150,11 +150,11 @@ func (l *personLog) resolve(exercise string) (*CatalogueExercise, error) {
 	case exact != nil:
 		return exact, nil
 	case len(candidates) == 1:
-		return candidates[0], nil
+		return candidates[0].exercise, nil
 	case len(candidates) > 1:
 		names := make([]string, len(candidates))
 		for i, c := range candidates {
-			names[i] = fmt.Sprintf("%s (%s)", c.Name, c.ID)
+			names[i] = fmt.Sprintf("%s (%s)", c.exercise.Name, c.exercise.ID)
 		}
 		return nil, fail("exercise_ambiguous", "%q could mean %s. Ask the user which one, then retry with its ID", exercise, strings.Join(names, ", "))
 	}
@@ -368,12 +368,13 @@ func (l *personLog) point(w *Workout, exerciseID, metric string) (Point, bool) {
 
 // ExerciseMatch is an exercise search_exercises found.
 type ExerciseMatch struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	Equipment      []string `json:"equipment"`
-	PrimaryMuscles []string `json:"primary_muscles"`
-	IsCustom       bool     `json:"is_custom"`
-	Score          float64  `json:"score"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	MeasurementType string   `json:"measurement_type"`
+	Equipment       []string `json:"equipment"`
+	PrimaryMuscles  []string `json:"primary_muscles"`
+	IsCustom        bool     `json:"is_custom"`
+	Score           float64  `json:"score"`
 }
 
 // SearchResult is search_exercises' result.
@@ -399,7 +400,7 @@ func (l *personLog) Search(query, equipment, muscle string, limit int) (Result, 
 		if equipment != "" && !slices.Contains(ex.Equipment, equipment) || muscle != "" && !slices.Contains(ex.PrimaryMuscles, muscle) {
 			continue
 		}
-		out.Exercises = append(out.Exercises, ExerciseMatch{ID: ex.ID, Name: ex.Name, Equipment: ex.Equipment,
+		out.Exercises = append(out.Exercises, ExerciseMatch{ID: ex.ID, Name: ex.Name, MeasurementType: ex.MeasurementType, Equipment: ex.Equipment,
 			PrimaryMuscles: ex.PrimaryMuscles, Score: round1(s.score)})
 		names = append(names, fmt.Sprintf("%s (%s)", ex.Name, ex.ID))
 		if len(out.Exercises) == limit {

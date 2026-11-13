@@ -78,6 +78,7 @@ OWS_TOKEN=… ows conformance https://api.example.com
 | `tombstone` | The change feed with `include_deleted=true` lists it in `deleted`, with `deleted_at` and `updated_at`, and no longer as a workout |
 | `stays-deleted` | Posting the deleted workout's `external_id` again is `not_found`, not a resurrection |
 | `webhooks` | `POST /v1/webhooks` answers `201` with the signing `secret`; the list shows the subscription without it; `DELETE` removes it. Nothing is delivered |
+| `document` | An OWS workout document posted as it is (`$schema`, `ows_version`, `id`s, `timezone`, loads as `{value, unit}`, set types, `x-` members, `source.external_id`) answers `201`; the server assigns its own ID, keeps the time zone, local day, loads and set types, reads the external ID from `source`, and drops the `x-` members. It's deleted afterwards |
 
 The script logs one workout and deletes it at the end, also when a check fails part way, so use a test account. The webhook it subscribes points at `example.com` and is removed straight away. Errors are RFC 9457 problems whose `code` the report quotes; `--json` prints the report as JSON.
 

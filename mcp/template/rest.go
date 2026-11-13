@@ -459,7 +459,12 @@ func readBody(w http.ResponseWriter, r *http.Request, v any) ([]byte, bool) {
 		problem(w, invalid("body", "at most 1 MB"))
 		return nil, false
 	}
-	dec := json.NewDecoder(bytes.NewReader(body))
+	stripped, err := withoutExtensions(body)
+	if err != nil {
+		problem(w, invalid("body", "not valid JSON: %v", err))
+		return nil, false
+	}
+	dec := json.NewDecoder(bytes.NewReader(stripped))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		problem(w, invalid("body", "not valid JSON for this endpoint: %v", err))
@@ -516,4 +521,34 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// withoutExtensions drops every x- member at any depth, which writes ignore (SPEC.md, section 8),
+// so the strict decoding that follows refuses only members nobody defined.
+func withoutExtensions(body []byte) ([]byte, error) {
+	var doc any
+	dec := json.NewDecoder(bytes.NewReader(body))
+	dec.UseNumber()
+	if err := dec.Decode(&doc); err != nil {
+		return nil, err
+	}
+	var strip func(v any)
+	strip = func(v any) {
+		switch v := v.(type) {
+		case map[string]any:
+			for k, child := range v {
+				if strings.HasPrefix(k, "x-") {
+					delete(v, k)
+					continue
+				}
+				strip(child)
+			}
+		case []any:
+			for _, child := range v {
+				strip(child)
+			}
+		}
+	}
+	strip(doc)
+	return json.Marshal(doc)
 }
