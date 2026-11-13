@@ -1089,13 +1089,7 @@ paths:
                 properties:
                   phrases:
                     type: array
-                    items:
-                      type: object
-                      required: [phrase, exercise_id, exercise_name]
-                      properties:
-                        phrase: { type: string }
-                        exercise_id: { type: string }
-                        exercise_name: { type: string }
+                    items: { $ref: "#/components/schemas/ExercisePhrase" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
@@ -3068,7 +3062,7 @@ components:
     LogExport:
       x-ows-core-as: OWSExport
       x-ofl-core-as: OFLExport
-      description: What the credential may read. `workouts`, `deleted_workouts`, `routines`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals` and `targets` with `meals:read`; `profile` with `profile:read`.
+      description: What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` with `profile:read`.
       type: object
       required: [exported_at, consents]
       properties:
@@ -3122,6 +3116,18 @@ components:
         routines:
           type: array
           items: { $ref: "#/components/schemas/Routine" }
+        exercises:
+          description: The person's own exercises (`usr:`), oldest first, including any never logged; with `workouts:read` only.
+          type: array
+          items: { $ref: "#/components/schemas/ExerciseMatch" }
+        exercise_phrases:
+          description: Words the matcher learned to mean an exercise for this person, as GET /v1/phrases lists them; with `workouts:read` only.
+          type: array
+          items: { $ref: "#/components/schemas/ExercisePhrase" }
+        food_phrases:
+          description: Words the person taught to mean a food, as GET /v1/food-phrases lists them; with `meals:read` only.
+          type: array
+          items: { $ref: "#/components/schemas/FoodPhrase" }
         program_suggestions_dismissed: { type: array, items: { type: string } }
         program_enrollments:
           type: array
@@ -4105,6 +4111,14 @@ components:
         deleted_at: { type: string, format: date-time }
         restore_until: { type: string, format: date-time }
 
+    ExercisePhrase:
+      description: Words the matcher learned to mean an exercise for this person (FR-2.6).
+      type: object
+      required: [phrase, exercise_id, exercise_name]
+      properties:
+        phrase: { type: string }
+        exercise_id: { type: string }
+        exercise_name: { type: string }
     FoodPhrase:
       type: object
       required: [phrase, food_id, food_name, updated_at]
