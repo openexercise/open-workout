@@ -166,7 +166,7 @@ export interface paths {
         put?: never;
         /**
          * Be told when the log changes
-         * @description Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume.
+         * @description Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume. (Lifterclub: also Open Food Log's `meal.created`, `meal.updated` and `meal.deleted`, whose deliveries carry `meal_id` in place of `workout_id` and are signed in `OFL-Signature` too. Each event needs its scope on the grant, `workouts:read` or `meals:read`, when subscribing and on every delivery: an app that loses a scope stops hearing about those events.)
          */
         post: operations["createWebhook"];
         delete?: never;
@@ -203,9 +203,11 @@ export interface paths {
          * Download the whole log
          * @description Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
          *     and a server may add more of the record beside them (Lifterclub adds the routines, program
-         *     runs, imports, consent history and the workouts the person deleted, so the file answers an
-         *     access request in full, and the profile if the credential has `profile:read`). `csv` has one
-         *     row per set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
+         *     runs, imports, consent history and the workouts the person deleted; the Open Food Log meals,
+         *     deleted meals and own foods with `meals:read`; and the profile with `profile:read`, so for
+         *     the web app the file answers an access request in full. With `meals:read` alone the file
+         *     holds the meals and the consent history, and no workouts). `csv` has one row per set, and
+         *     needs `workouts:read`; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
          *     don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
          *     an hour per account). If it fails part way the connection is cut, so an incomplete file never
          *     looks finished.
@@ -241,6 +243,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Workout: components["schemas"]["workout"];
+        Load: components["schemas"]["load"];
         /**
          * @description catalogue and custom are confirmed; close and unmatched need confirmation.
          * @enum {unknown}
@@ -257,7 +260,7 @@ export interface components {
             status: number;
             detail?: string;
             /** @enum {unknown} */
-            code: "invalid_input" | "consent_required" | "nothing_to_log" | "parse_unsure" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error";
+            code: "invalid_input" | "consent_required" | "nothing_to_log" | "parse_unsure" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error" | "photo_unread";
             /** @description For invalid_input. */
             field?: string;
             /** @description For exercise_ambiguous. */
@@ -399,6 +402,12 @@ export interface components {
             id: string;
             version?: number;
             day?: string;
+            /** @description An OWS workout's program label. Ignored. */
+            listed?: boolean;
+            /** @description An OWS workout's program label. Ignored. */
+            name?: string;
+            /** @description An OWS workout's program label. Ignored. */
+            day_name?: string;
         };
         Warning: {
             /** @enum {unknown} */
@@ -414,10 +423,18 @@ export interface components {
             is_custom: boolean;
             score: number;
         };
+        /** @description A set as a client describes it, or as an OWS workout document has it. */
         SetInput: {
+            /** @description A stored set's ID, as an OWS document carries it. Ignored. */
+            id?: string;
+            /**
+             * @description The OWS set type; working when left out. Only warm-ups are left out of records.
+             * @enum {unknown}
+             */
+            type?: "working" | "warmup" | "backoff" | "amrap" | "failure" | "drop";
             reps?: number;
-            /** @description Leave out for bodyweight. */
-            load?: number;
+            /** @description Leave out for bodyweight. A number with unit beside it, or an OWS load {value, unit}. */
+            load?: number | components["schemas"]["load"];
             /** @description Leave out for the user's unit. */
             unit?: components["schemas"]["Unit"];
             rpe?: number;
@@ -427,28 +444,61 @@ export interface components {
             calories?: number;
             /** @description Average heart rate over the set, only as a watch or app reported it. */
             heart_rate_bpm?: number;
-            /** @description Warm-ups don't count toward records. */
+            /** @description The same as type warmup. Warm-ups don't count toward records. */
             warmup?: boolean;
             /** @description The values were inferred (e.g. read from a photo), not stated. */
             estimated?: boolean;
         };
+        /** @description One exercise and its sets: name and exercise_id, or an OWS entry's exercise and text. */
         ExerciseInput: {
+            /** @description A stored entry's ID, as an OWS document carries it. Ignored. */
+            id?: string;
             /** @description The exercise as the user named it. */
             name?: string;
             /** @description A catalogue or custom ID, when known; skips matching. */
             exercise_id?: string;
+            /** @description An OWS entry's exercise. Its id is exercise_id; its name is used when neither name nor text is given; match is the server's and ignored. */
+            exercise?: {
+                id?: string | null;
+                name?: string;
+                match?: string;
+            };
+            /** @description An OWS entry's text: what the person called the exercise. Used as name when name isn't given. */
+            text?: string;
             sets: components["schemas"]["SetInput"][];
             notes?: string;
         };
+        /** @description A workout to log. An OWS workout document can be posted as it is: the members the server assigns (id, updated_at, merged_sources, source's kind and client, entries' and sets' id, an exercise's match, a program label's name, day_name and listed) are ignored. */
         WorkoutInput: {
+            /** @constant */
+            $schema?: "https://openworkout.dev/schema/v0/workout.json";
+            /** @description A stored workout's ID, as an OWS document carries it. Ignored. */
+            id?: string;
+            /**
+             * Format: date-time
+             * @description Ignored: the server's clock sets it.
+             */
+            updated_at?: string;
+            /** @description Ignored: merges are the server's. */
+            merged_sources?: Record<string, never>[];
             /** Format: date-time */
             started_at?: string;
-            /** @description Day in the user's timezone, when started_at is not given. Default today. */
+            /** @description Day in the workout's timezone, when started_at is not given. Default today. The start is then worked out and listed in estimates as /started_at. */
             date?: components["schemas"]["Date"];
+            /** @description The IANA time zone the workout happened in (America/Chicago), which decides its local day. Default the person's. */
+            timezone?: string;
             title?: string;
             notes?: string;
             exercises: components["schemas"]["ExerciseInput"][];
             program?: components["schemas"]["ProgramRef"];
+            /** @description An OWS document's source. Its external_id is read as external_id; kind and client come from your credential. */
+            source?: {
+                kind?: string;
+                client?: string;
+                external_id?: string | null;
+            };
+            /** @description JSON pointers (RFC 6901) into this body to values you inferred rather than were told: a set, or a value in one (the set is marked), a set's /load/unit (the unit was assumed), or /started_at. */
+            estimates?: string[];
             /** @description Your app's own ID for this workout. A second POST with the same ID replays the first (200, `Idempotent-Replayed: true`) instead of logging twice; one the person has since deleted here answers 404 and stays deleted. Not for the web app. */
             external_id?: string;
         };

@@ -116,6 +116,9 @@ type WorkoutInput struct {
 	// ExternalID is your app's own ID for the workout: a second POST with it replays the first
 	// (Logged.Replayed) for ever, and one the person deleted here is not_found and stays deleted.
 	ExternalID string `json:"external_id,omitempty"`
+	// Estimates are JSON pointers into this input to values you inferred: a set, or a value in
+	// one, a set's /load/unit, or /started_at.
+	Estimates []string `json:"estimates,omitempty"`
 }
 
 // ExerciseInput is one exercise to log, by name as the user said it or by ID when known.
@@ -129,6 +132,8 @@ type ExerciseInput struct {
 // SetInput is one set to log. Leave Load nil for bodyweight and Unit empty for the user's unit
 // (then listed in Workout.Estimates as assumed).
 type SetInput struct {
+	// Type is the OWS set type (working, warmup, backoff, amrap, failure, drop); default working.
+	Type         string   `json:"type,omitempty"`
 	Reps         *int     `json:"reps,omitempty"`
 	Load         *float64 `json:"load,omitempty"`
 	Unit         Unit     `json:"unit,omitempty"`

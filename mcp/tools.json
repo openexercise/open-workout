@@ -766,6 +766,7 @@
     },
     {
       "_meta": {
+        "dev.openfoodlog/profile": "core",
         "dev.openworkout/profile": "core"
       },
       "annotations": {
@@ -774,7 +775,7 @@
         "openWorldHint": false,
         "readOnlyHint": false
       },
-      "description": "Restore what delete_entry removed, using its undo_token, within 10 minutes.",
+      "description": "Restore what delete_entry (or delete_meal, on a server that keeps a food log) removed, using its undo_token, within 10 minutes.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {

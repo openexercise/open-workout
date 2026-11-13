@@ -155,6 +155,14 @@ func (c *Client) LogWorkout(ctx context.Context, in WorkoutInput) (*Logged, erro
 	return &out, c.Do(ctx, http.MethodPost, "/v1/workouts", nil, in, &out)
 }
 
+// LogDocument logs an OWS workout document as it is, such as one read from another server or
+// another app's export: the members a server assigns (IDs, updated_at, merged_sources, source's
+// kind and client) are ignored, and source's external_id replays like WorkoutInput's.
+func (c *Client) LogDocument(ctx context.Context, w Workout) (*Logged, error) {
+	var out Logged
+	return &out, c.Do(ctx, http.MethodPost, "/v1/workouts", nil, w, &out)
+}
+
 // LogText parses the user's words and logs them in one step. A sentence the API can't read
 // reliably is CodeParseUnsure, with nothing saved: send structure to LogWorkout instead.
 // Lifterclub extension.
