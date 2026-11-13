@@ -281,7 +281,7 @@ paths:
     post:
       operationId: createWebhook
       summary: Be told when the log changes
-      description: "Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume. (Lifterclub: also Open Food Log's `meal.created`, `meal.updated` and `meal.deleted`, whose deliveries carry `meal_id` in place of `workout_id` and are signed in `OFL-Signature` too. Each event needs its scope on the grant, `workouts:read` or `meals:read`, when subscribing and on every delivery: an app that loses a scope stops hearing about those events.)"
+      description: "Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume."
       tags: [Webhooks]
       security: [{oauth2: ['workouts:read']}]
       requestBody:
@@ -321,14 +321,9 @@ paths:
       summary: Download the whole log
       description: |
         Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
-        and a server may add more of the record beside them (Lifterclub adds the routines, program
-        runs, imports, consent history and the workouts the person deleted; the Open Food Log meals,
-        deleted meals and own foods with `meals:read`; and the profile with `profile:read`, so for
-        the web app the file answers an access request in full. With `meals:read` alone the file
-        holds the meals and the consent history, and no workouts). `csv` has one row per set, and
+        and a server may add more of the record beside them. `csv` has one row per set, and
         needs `workouts:read`; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
-        don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
-        an hour per account). If it fails part way the connection is cut, so an incomplete file never
+        don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs. If it fails part way the connection is cut, so an incomplete file never
         looks finished.
       tags: [Workouts]
       security: [{oauth2: ['workouts:read']}]
@@ -452,7 +447,7 @@ components:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
     Unprocessable:
-      description: "`nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      description: "`exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
       content:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
@@ -486,16 +481,12 @@ components:
         status: {type: integer}
         detail: {type: string}
         code:
-          enum: [invalid_input, consent_required, nothing_to_log, parse_unsure, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error, photo_unread]
+          enum: [invalid_input, consent_required, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
         field: {type: string, description: For invalid_input.}
         candidates:
           type: array
           description: For exercise_ambiguous.
           items: {$ref: "#/components/schemas/Candidate"}
-        warnings:
-          type: array
-          description: For nothing_to_log and parse_unsure.
-          items: {$ref: "#/components/schemas/Warning"}
     BearerError:
       type: object
       required: [error]
@@ -504,7 +495,7 @@ components:
         error_description: {type: string}
     WorkoutList:
       type: object
-      required: [workouts, totals, truncated, summary]
+      required: [workouts, truncated]
       properties:
         from: {$ref: "#/components/schemas/Date", description: First day listed; absent in the change feed.}
         to: {$ref: "#/components/schemas/Date", description: Last day listed; absent in the change feed.}
@@ -517,10 +508,8 @@ components:
           type: array
           description: Workouts deleted since `updated_since`, when `include_deleted` was asked for.
           items: {$ref: "#/components/schemas/Tombstone"}
-        totals: {$ref: "#/components/schemas/Totals"}
         truncated: {type: boolean, description: More workouts follow; pass next_cursor.}
         next_cursor: {type: string}
-        summary: {type: string}
     WebhookInput:
       type: object
       required: [url, events]
@@ -561,49 +550,16 @@ components:
         deleted_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         merged_into: {type: string, description: "The workout it was merged into, when another app's record of the same session absorbed it."}
-    Totals:
-      type: object
-      description: Working sets on this page.
-      required: [workouts, sets, volume, unit]
-      properties:
-        workouts: {type: integer}
-        sets: {type: integer}
-        volume: {type: number, description: Sum of load × reps.}
-        unit: {$ref: "#/components/schemas/Unit"}
     Logged:
       type: object
       description: The result of a write.
-      required: [workout, summary, new_records, needs_confirmation]
+      required: [workout, needs_confirmation]
       properties:
         workout: {$ref: "#/components/schemas/Workout"}
-        summary: {type: string, description: One line to show the user.}
-        new_records:
-          type: array
-          items: {$ref: "#/components/schemas/Record"}
         needs_confirmation:
           type: array
           items: {$ref: "#/components/schemas/Confirmation"}
         replayed: {type: boolean}
-        parse_method: {type: string, description: "How text was read, for a write made from text: llm or fallback."}
-        warnings:
-          type: array
-          description: For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out.
-          items: {$ref: "#/components/schemas/Warning"}
-    Record:
-      type: object
-      description: A personal record the write changed.
-      required: [exercise_id, exercise_name, kind, value, unit, set_id]
-      properties:
-        exercise_id: {type: string}
-        exercise_name: {type: string}
-        kind: {$ref: "#/components/schemas/RecordKind"}
-        value: {type: number}
-        unit: {$ref: "#/components/schemas/Unit"}
-        previous: {type: number, description: Absent for a first record.}
-        set_id: {type: string, format: uuid}
-        removed: {type: boolean, description: No set qualifies any more; value is 0.}
-    RecordKind:
-      enum: [heaviest_load, best_e1rm, best_set_volume]
     Confirmation:
       type: object
       description: An exercise to confirm with the user, then fix with PATCH /v1/entries/{entry_id}.
@@ -628,16 +584,12 @@ components:
       enum: [weight_reps, reps, duration, distance_duration, assisted_weight_reps]
     Deleted:
       type: object
-      required: [kind, id, undo_token, undo_expires_at, records_changed, summary]
+      required: [kind, id, undo_token, undo_expires_at]
       properties:
         kind: {enum: [workout, exercise, set]}
         id: {type: string, format: uuid}
         undo_token: {type: string}
         undo_expires_at: {type: string, format: date-time}
-        records_changed:
-          type: array
-          items: {$ref: "#/components/schemas/Record"}
-        summary: {type: string}
     OWSExport:
       description: The log as the Open Workout core promises it, an OWS v0 log document (https://openworkout.dev/schema/v0/log.json). A server may add more of the person's record beside its keys.
       $ref: "../schema/v0/log.json"
@@ -651,12 +603,6 @@ components:
         listed: {type: boolean, description: "An OWS workout's program label. Ignored."}
         name: {type: string, description: "An OWS workout's program label. Ignored."}
         day_name: {type: string, description: "An OWS workout's program label. Ignored."}
-    Warning:
-      type: object
-      required: [code]
-      properties:
-        code: {enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited]}
-        detail: {type: string}
     ExerciseMatch:
       type: object
       required: [id, name, measurement_type, equipment, primary_muscles, is_custom, score]
@@ -687,7 +633,7 @@ components:
         calories: {type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them."}
         heart_rate_bpm: {type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it."}
         warmup: {type: boolean, description: "The same as type warmup. Warm-ups don't count toward records."}
-        estimated: {type: boolean, description: "The values were inferred (e.g. read from a photo), not stated."}
+        estimated: {type: boolean, description: "The values were inferred, not stated: read off a machine's screen, say."}
     ExerciseInput:
       type: object
       required: [sets]

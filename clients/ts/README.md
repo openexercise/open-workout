@@ -38,7 +38,7 @@ const logged = unwrap(
     body: { external_id: 'my-42', exercises: [{ name: 'bench press', sets: [{ reps: 5, load: 185, unit: 'lb' }] }] },
   }),
 )
-console.log(logged.summary)
+console.log(`Logged ${logged.workout.id}`)
 
 // Mirror a log: every change since the last time, oldest first, deleted ones as tombstones.
 for await (const change of changes(api, { updatedSince: lastSeen, includeDeleted: true })) {

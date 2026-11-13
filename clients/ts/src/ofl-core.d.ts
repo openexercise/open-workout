@@ -19,7 +19,7 @@ export interface paths {
         put?: never;
         /**
          * Be told when the log changes
-         * @description Subscribes the calling app to changes in this person's food log. Each changed meal becomes one signed POST to `url` carrying the kind of change and the meal's ID, never its content; read the meal afterwards. The `secret` in the response is shown once. Deliveries are signed in `OFL-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>">`. Only a connected app can subscribe, not a person's own key. A server says how often it delivers and how many subscriptions an app may hold (Lifterclub: every minute, at most 5 per app and account). Ten failed deliveries in a row pause the subscription; subscribe again to resume. (Lifterclub also serves Open Workout's `workout.*` events here, with `workouts:read`.)
+         * @description Subscribes the calling app to changes in this person's food log. Each changed meal becomes one signed POST to `url` carrying the kind of change and the meal's ID, never its content; read the meal afterwards. The `secret` in the response is shown once. Deliveries are signed in `OFL-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256 of "<t>.<body>">`. Only a connected app can subscribe, not a person's own key. A server says how often it delivers and how many subscriptions an app may hold. Ten failed deliveries in a row pause the subscription; subscribe again to resume.
          */
         post: operations["createWebhook"];
         delete?: never;
@@ -57,9 +57,8 @@ export interface paths {
          * @description Every meal in the log, newest first, as an Open Food Log v0 log document
          *     (https://openfoodlog.org/schema/v0/log.json): the meals, the person's own foods they name,
          *     and the meals the person deleted, for a server that keeps them. A server may add more of the
-         *     record beside them (Lifterclub adds the consent history, and the workouts with `workouts:read`).
-         *     Only `format=json` is part of this core. A server may limit how often it runs (Lifterclub: 10
-         *     an hour per account). If it fails part way the connection is cut, so an incomplete file never
+         *     record beside them.
+         *     Only `format=json` is part of this core. A server may limit how often it runs. If it fails part way the connection is cut, so an incomplete file never
          *     looks finished.
          */
         get: operations["exportLog"];
@@ -94,7 +93,7 @@ export interface paths {
          *     and the serving becomes the default portion. `energy_kcal` is required. More than 900 kcal,
          *     or more than 100 g of protein, fat and carbohydrate, in 100 g is refused as numbers per
          *     serving typed as per 100 g. It's visible only to this user. If the user already has a food
-         *     by that name, it's returned unchanged (200). A server may limit how many (Lifterclub: 1,000).
+         *     by that name, it's returned unchanged (200). A server may limit how many.
          */
         post: operations["createFood"];
         delete?: never;
@@ -113,7 +112,7 @@ export interface paths {
         /**
          * The user's meals on some days, or the meals change feed
          * @description Days are YYYY-MM-DD in the user's timezone, inclusive; both default to today. A server may
-         *     limit the span (Lifterclub: 92 days). Earliest first, with each day's totals, unless the
+         *     limit the span. Earliest first, with each day's totals, unless the
          *     person asked not to see numbers: then `days` is left out, and the meals and their items stay.
          *
          *     With `updated_since`, this is the change feed: every meal whose stored record changed at or
@@ -157,14 +156,14 @@ export interface paths {
         };
         /**
          * One meal
-         * @description An Open Food Log meal, with its totals unless the person asked not to see numbers (Lifterclub's calm mode).
+         * @description An Open Food Log meal, with its totals unless the person asked not to see numbers.
          */
         get: operations["getMeal"];
         put?: never;
         post?: never;
         /**
          * Delete a meal
-         * @description Restorable for a while with POST /v1/meals/{id}/restore (Lifterclub keeps it 10 minutes, and its export keeps deleted meals). A server may ask for no consent to delete.
+         * @description Restorable for a while with POST /v1/meals/{id}/restore. A server may ask for no consent to delete.
          */
         delete: operations["deleteMeal"];
         options?: never;
@@ -189,7 +188,7 @@ export interface paths {
         put?: never;
         /**
          * Restore a deleted meal
-         * @description Undoes a delete within the time the server keeps it (Lifterclub's is 10 minutes); after that, `undo_unavailable`.
+         * @description Undoes a delete within the time the server keeps it; after that, `undo_unavailable`.
          */
         post: operations["restoreMeal"];
         delete?: never;
@@ -258,12 +257,12 @@ export interface paths {
          *     (https://openfoodlog.org/schema/v0/targets.json). Hiding numbers from the person doesn't
          *     hide them: they're the person's settings, and what's hidden is progress against them
          *     (`GET /v1/nutrition/summary`). `updated_at` is the latest change to any target, absent when
-         *     there are none. (Lifterclub never sets or suggests one.)
+         *     there are none.
          */
         get: operations["getTargets"];
         /**
          * Replace the user's nutrition targets
-         * @description Replaces the whole list, in order (a server may cap its length; Lifterclub: 100). An entry
+         * @description Replaces the whole list, in order (a server may cap its length). An entry
          *     with an `id` keeps it and must be one of the user's targets; one without gets a new one;
          *     targets left out are removed, so to change a target from some day on, end the old one with
          *     `effective_to` and add a new one. `effective_from` defaults to today in the user's timezone
@@ -288,8 +287,7 @@ export interface paths {
         /**
          * Totals per day and how each target went
          * @description Each day's totals from `from` to `to` (inclusive, in the user's timezone; `to` defaults to
-         *     today and `from` to the six days before it; a server may limit the span, Lifterclub to 92
-         *     days), each target that applied to the day or to one of its meals with its status, per
+         *     today and `from` to the six days before it; a server may limit the span), each target that applied to the day or to one of its meals with its status, per
          *     target how many days or meals it applied to and was met, and the days at target: those
          *     where every target that applied was met.
          *
@@ -301,7 +299,7 @@ export interface paths {
          *     several targets apply, the one for some weekdays wins, then one for a meal type, then the
          *     latest `effective_from`, then the later entry.
          *
-         *     When the person asked not to see numbers (Lifterclub's calm mode) it holds none:
+         *     When the person asked not to see numbers it holds none:
          *     `calm_mode` is true and each day has only its date and meal count.
          */
         get: operations["getNutritionSummary"];
@@ -318,7 +316,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description A food ID, e.g. `ofc:bananas-raw`, one of the user's `usr:` foods, or (Lifterclub) a packaged product's barcode as `gtin:` with 8 to 14 digits. */
+                /** @description A food ID, e.g. `ofc:bananas-raw`, or one of the user's `usr:` foods. */
                 id: string;
             };
             cookie?: never;
@@ -326,9 +324,7 @@ export interface paths {
         /**
          * One food
          * @description A catalogue food with its portions, aliases and sources, or one of the user's own. A retired
-         *     catalogue food is still returned, since meals may name it. (Lifterclub also answers a
-         *     packaged product's barcode as a `gtin:` ID, looked up live at Open Food Facts, and 503 when
-         *     it can't be reached.)
+         *     catalogue food is still returned, since meals may name it.
          */
         get: operations["getFood"];
         put?: never;
@@ -350,13 +346,9 @@ export interface components {
             status: number;
             detail?: string;
             /** @enum {unknown} */
-            code: "invalid_input" | "consent_required" | "nothing_to_log" | "parse_unsure" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error" | "photo_unread";
+            code: "invalid_input" | "consent_required" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error";
             /** @description For invalid_input. */
             field?: string;
-            /** @description For exercise_ambiguous. */
-            candidates?: components["schemas"]["Candidate"][];
-            /** @description For nothing_to_log and parse_unsure. */
-            warnings?: components["schemas"]["Warning"][];
         };
         BearerError: {
             /** @enum {unknown} */
@@ -390,15 +382,6 @@ export interface components {
         MealWebhookList: {
             webhooks: components["schemas"]["MealWebhook"][];
         };
-        Candidate: {
-            id: string;
-            name: string;
-            measurement_type: components["schemas"]["MeasurementType"];
-            is_custom: boolean;
-            score: number;
-        };
-        /** @enum {unknown} */
-        MeasurementType: "weight_reps" | "reps" | "duration" | "distance_duration" | "assisted_weight_reps";
         /** @description The log as the Open Food Log core promises it, an OFL v0 log document (https://openfoodlog.org/schema/v0/log.json). A server may add more of the person's record beside its keys. */
         OFLExport: {
             /** @constant */
@@ -416,11 +399,6 @@ export interface components {
                 meal: components["schemas"]["Meal"];
             }[];
         };
-        Warning: {
-            /** @enum {unknown} */
-            code: "llm_unavailable" | "llm_rejected" | "skipped_segment" | "could_not_parse" | "value_dropped" | "date_unread" | "relative_reference" | "llm_limited";
-            detail?: string;
-        };
         /** @description How much, in the measure the person used (OFL v0.1 section 6). Cups and spoons are portions; serving is the food's declared label serving. */
         FoodAmount: {
             value: number;
@@ -432,7 +410,7 @@ export interface components {
         MealItemInput: {
             /** @description What the person called it. May be left empty with a food_id. */
             text: string;
-            /** @description A food from GET /v1/foods (Lifterclub: or a packaged product by its barcode as gtin:, looked up at Open Food Facts). */
+            /** @description A food from GET /v1/foods. */
             food_id?: string;
             amount?: components["schemas"]["FoodAmount"];
             /** @description For an item that names no food only. */
@@ -460,7 +438,7 @@ export interface components {
             logged_at?: string;
             /** @enum {string} */
             meal_type?: "breakfast" | "lunch" | "dinner" | "snack";
-            /** @description The person's own name for the occasion (pre-workout, iftar), beside or instead of meal_type. */
+            /** @description The person's own name for the occasion (second breakfast, iftar), beside or instead of meal_type. */
             label?: string;
             title?: string;
             notes?: string;
@@ -588,12 +566,12 @@ export interface components {
                 text: string;
                 candidates: components["schemas"]["FoodMatch"][];
             }[];
-            /** @description Left out when the person asked not to see numbers (Lifterclub's calm mode). */
+            /** @description Left out when the person asked not to see numbers. */
             totals?: components["schemas"]["MealTotals"];
         };
         MealList: {
             meals: components["schemas"]["Meal"][];
-            /** @description Each day's totals; left out when the person asked not to see numbers (Lifterclub's calm mode). */
+            /** @description Each day's totals; left out when the person asked not to see numbers. */
             days?: {
                 /** Format: date */
                 date: string;
@@ -753,7 +731,7 @@ export interface components {
             from: string;
             /** Format: date */
             to: string;
-            /** @description When true (the person asked not to see numbers: Lifterclub's calm mode), the summary holds no numbers but meal counts. */
+            /** @description When true, the person asked not to see numbers, so the summary holds no numbers but meal counts. */
             calm_mode: boolean;
             /** @description Every day from `from` to `to`, earliest first. */
             days: {
@@ -856,7 +834,7 @@ export interface components {
             id: string;
             name: string;
             /**
-             * @description branded: a packaged product (Lifterclub: from Open Food Facts, by its gtin: ID).
+             * @description branded: a packaged product.
              * @enum {string}
              */
             kind: "generic" | "branded" | "custom";
@@ -1025,7 +1003,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description `nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`. */
+        /** @description `idempotency_conflict`, or `undo_unavailable` where an operation says so. */
         Unprocessable: {
             headers: {
                 [name: string]: unknown;
@@ -1419,7 +1397,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
-            /** @description `undo_unavailable`: not deleted, or deleted too long ago (Lifterclub: 10 minutes). */
+            /** @description `undo_unavailable`: not deleted, or deleted too long ago. */
             422: components["responses"]["Unprocessable"];
             429: components["responses"]["RateLimited"];
         };
@@ -1613,7 +1591,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description A food ID, e.g. `ofc:bananas-raw`, one of the user's `usr:` foods, or (Lifterclub) a packaged product's barcode as `gtin:` with 8 to 14 digits. */
+                /** @description A food ID, e.g. `ofc:bananas-raw`, or one of the user's `usr:` foods. */
                 id: string;
             };
             cookie?: never;

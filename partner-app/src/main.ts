@@ -60,7 +60,7 @@ const logged = unwrap(
     },
   }),
 )
-console.log(logged.summary)
+console.log(`Logged ${logged.workout.id}.`)
 for (const c of logged.needs_confirmation) {
   console.log(`  confirm "${c.text}" with the person: ${c.candidates.map((x) => x.name).join(', ') || 'no candidates'}`)
 }

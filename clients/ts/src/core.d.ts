@@ -166,7 +166,7 @@ export interface paths {
         put?: never;
         /**
          * Be told when the log changes
-         * @description Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume. (Lifterclub: also Open Food Log's `meal.created`, `meal.updated` and `meal.deleted`, whose deliveries carry `meal_id` in place of `workout_id` and are signed in `OFL-Signature` too. Each event needs its scope on the grant, `workouts:read` or `meals:read`, when subscribing and on every delivery: an app that loses a scope stops hearing about those events.)
+         * @description Subscribes the calling app to changes in this person's log. Every minute, each changed workout becomes one signed POST to `url` carrying the kind of change and the workout's ID, never its content; read the workout afterwards. The `secret` in the response is shown once. Only a connected app can subscribe: not a personal key, not the web app. At most 5 per app and account. Ten failed deliveries in a row pause the subscription; subscribe again to resume.
          */
         post: operations["createWebhook"];
         delete?: never;
@@ -202,14 +202,9 @@ export interface paths {
         /**
          * Download the whole log
          * @description Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
-         *     and a server may add more of the record beside them (Lifterclub adds the routines, program
-         *     runs, imports, consent history and the workouts the person deleted; the Open Food Log meals,
-         *     deleted meals and own foods with `meals:read`; and the profile with `profile:read`, so for
-         *     the web app the file answers an access request in full. With `meals:read` alone the file
-         *     holds the meals and the consent history, and no workouts). `csv` has one row per set, and
+         *     and a server may add more of the record beside them. `csv` has one row per set, and
          *     needs `workouts:read`; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
-         *     don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
-         *     an hour per account). If it fails part way the connection is cut, so an incomplete file never
+         *     don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs. If it fails part way the connection is cut, so an incomplete file never
          *     looks finished.
          */
         get: operations["exportLog"];
@@ -260,13 +255,11 @@ export interface components {
             status: number;
             detail?: string;
             /** @enum {unknown} */
-            code: "invalid_input" | "consent_required" | "nothing_to_log" | "parse_unsure" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error" | "photo_unread";
+            code: "invalid_input" | "consent_required" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error";
             /** @description For invalid_input. */
             field?: string;
             /** @description For exercise_ambiguous. */
             candidates?: components["schemas"]["Candidate"][];
-            /** @description For nothing_to_log and parse_unsure. */
-            warnings?: components["schemas"]["Warning"][];
         };
         BearerError: {
             /** @enum {unknown} */
@@ -288,11 +281,9 @@ export interface components {
             updated_since?: string;
             /** @description Workouts deleted since `updated_since`, when `include_deleted` was asked for. */
             deleted?: components["schemas"]["Tombstone"][];
-            totals: components["schemas"]["Totals"];
             /** @description More workouts follow; pass next_cursor. */
             truncated: boolean;
             next_cursor?: string;
-            summary: string;
         };
         WebhookInput: {
             /** @description An https URL on a public host, with no credentials. Checked again on every delivery, on the address actually reached. */
@@ -331,43 +322,12 @@ export interface components {
             /** @description The workout it was merged into, when another app's record of the same session absorbed it. */
             merged_into?: string;
         };
-        /** @description Working sets on this page. */
-        Totals: {
-            workouts: number;
-            sets: number;
-            /** @description Sum of load × reps. */
-            volume: number;
-            unit: components["schemas"]["Unit"];
-        };
         /** @description The result of a write. */
         Logged: {
             workout: components["schemas"]["workout"];
-            /** @description One line to show the user. */
-            summary: string;
-            new_records: components["schemas"]["Record"][];
             needs_confirmation: components["schemas"]["Confirmation"][];
             replayed?: boolean;
-            /** @description How text was read, for a write made from text: llm or fallback. */
-            parse_method?: string;
-            /** @description For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out. */
-            warnings?: components["schemas"]["Warning"][];
         };
-        /** @description A personal record the write changed. */
-        Record: {
-            exercise_id: string;
-            exercise_name: string;
-            kind: components["schemas"]["RecordKind"];
-            value: number;
-            unit: components["schemas"]["Unit"];
-            /** @description Absent for a first record. */
-            previous?: number;
-            /** Format: uuid */
-            set_id: string;
-            /** @description No set qualifies any more; value is 0. */
-            removed?: boolean;
-        };
-        /** @enum {unknown} */
-        RecordKind: "heaviest_load" | "best_e1rm" | "best_set_volume";
         /** @description An exercise to confirm with the user, then fix with PATCH /v1/entries/{entry_id}. */
         Confirmation: {
             /** Format: uuid */
@@ -393,8 +353,6 @@ export interface components {
             undo_token: string;
             /** Format: date-time */
             undo_expires_at: string;
-            records_changed: components["schemas"]["Record"][];
-            summary: string;
         };
         /** @description The log as the Open Workout core promises it, an OWS v0 log document (https://openworkout.dev/schema/v0/log.json). A server may add more of the person's record beside its keys. */
         OWSExport: components["schemas"]["log"];
@@ -408,11 +366,6 @@ export interface components {
             name?: string;
             /** @description An OWS workout's program label. Ignored. */
             day_name?: string;
-        };
-        Warning: {
-            /** @enum {unknown} */
-            code: "llm_unavailable" | "llm_rejected" | "skipped_segment" | "could_not_parse" | "value_dropped" | "date_unread" | "relative_reference" | "llm_limited";
-            detail?: string;
         };
         ExerciseMatch: {
             id: string;
@@ -446,7 +399,7 @@ export interface components {
             heart_rate_bpm?: number;
             /** @description The same as type warmup. Warm-ups don't count toward records. */
             warmup?: boolean;
-            /** @description The values were inferred (e.g. read from a photo), not stated. */
+            /** @description The values were inferred, not stated: read off a machine's screen, say. */
             estimated?: boolean;
         };
         /** @description One exercise and its sets: name and exercise_id, or an OWS entry's exercise and text. */
@@ -798,7 +751,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description `nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`. */
+        /** @description `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`. */
         Unprocessable: {
             headers: {
                 [name: string]: unknown;

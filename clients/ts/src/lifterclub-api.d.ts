@@ -1131,7 +1131,7 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
-                /** @description A food ID, e.g. `ofc:bananas-raw`, one of the user's `usr:` foods, or (Lifterclub) a packaged product's barcode as `gtin:` with 8 to 14 digits. */
+                /** @description A food ID, e.g. `ofc:bananas-raw`, or one of the user's `usr:` foods (Lifterclub: or a packaged product's barcode as `gtin:` with 8 to 14 digits). */
                 id: string;
             };
             cookie?: never;
@@ -2352,7 +2352,7 @@ export interface components {
             logged_at?: string;
             /** @enum {string} */
             meal_type?: "breakfast" | "lunch" | "dinner" | "snack";
-            /** @description The person's own name for the occasion (pre-workout, iftar), beside or instead of meal_type. */
+            /** @description The person's own name for the occasion (second breakfast, iftar), beside or instead of meal_type. */
             label?: string;
             title?: string;
             notes?: string;
@@ -2717,7 +2717,7 @@ export interface components {
             from: string;
             /** Format: date */
             to: string;
-            /** @description When true (the person asked not to see numbers: Lifterclub's calm mode), the summary holds no numbers but meal counts. */
+            /** @description When true, the person asked not to see numbers (Lifterclub's calm mode), so the summary holds no numbers but meal counts. */
             calm_mode: boolean;
             /** @description Every day from `from` to `to`, earliest first. */
             days: {
@@ -2971,7 +2971,7 @@ export interface components {
             heart_rate_bpm?: number;
             /** @description The same as type warmup. Warm-ups don't count toward records. */
             warmup?: boolean;
-            /** @description The values were inferred (e.g. read from a photo), not stated. */
+            /** @description The values were inferred, not stated: read off a machine's screen, say. */
             estimated?: boolean;
         };
         /** @description One exercise and its sets: name and exercise_id, or an OWS entry's exercise and text. */
@@ -5406,7 +5406,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description A food ID, e.g. `ofc:bananas-raw`, one of the user's `usr:` foods, or (Lifterclub) a packaged product's barcode as `gtin:` with 8 to 14 digits. */
+                /** @description A food ID, e.g. `ofc:bananas-raw`, or one of the user's `usr:` foods (Lifterclub: or a packaged product's barcode as `gtin:` with 8 to 14 digits). */
                 id: string;
             };
             cookie?: never;

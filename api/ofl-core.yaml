@@ -29,14 +29,11 @@ tags:
   - name: Foods
     description: |
       Foods to log meals against. A food is an Open Food Log v0 food: nutrients per 100 g, each key
-      ending in its unit, a missing key unknown. (Lifterclub: the Open Food Catalogue, `ofc:`,
-      generic foods from USDA FoodData Central, CC0, at https://openfoodlog.org, and each user's
-      own, `usr:`.)
+      ending in its unit, a missing key unknown.
   - name: Meals
     description: |
       What the user ate, as Open Food Log v0 meals (https://openfoodlog.org). Health data: writes
-      need consent. A server may leave totals out when the person asked not to see numbers
-      (Lifterclub's calm mode); the meals and their items stay.
+      need consent. A server may leave totals out when the person asked not to see numbers; the meals and their items stay.
 paths:
   /v1/webhooks:
     get:
@@ -57,7 +54,7 @@ paths:
     post:
       operationId: createWebhook
       summary: Be told when the log changes
-      description: "Subscribes the calling app to changes in this person's food log. Each changed meal becomes one signed POST to `url` carrying the kind of change and the meal's ID, never its content; read the meal afterwards. The `secret` in the response is shown once. Deliveries are signed in `OFL-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">`. Only a connected app can subscribe, not a person's own key. A server says how often it delivers and how many subscriptions an app may hold (Lifterclub: every minute, at most 5 per app and account). Ten failed deliveries in a row pause the subscription; subscribe again to resume. (Lifterclub also serves Open Workout's `workout.*` events here, with `workouts:read`.)"
+      description: "Subscribes the calling app to changes in this person's food log. Each changed meal becomes one signed POST to `url` carrying the kind of change and the meal's ID, never its content; read the meal afterwards. The `secret` in the response is shown once. Deliveries are signed in `OFL-Signature`: `t=<unix seconds>,v1=<hex HMAC-SHA256 of \"<t>.<body>\">`. Only a connected app can subscribe, not a person's own key. A server says how often it delivers and how many subscriptions an app may hold. Ten failed deliveries in a row pause the subscription; subscribe again to resume."
       tags: [Webhooks]
       security: [{oauth2: ['meals:read']}]
       requestBody:
@@ -99,9 +96,8 @@ paths:
         Every meal in the log, newest first, as an Open Food Log v0 log document
         (https://openfoodlog.org/schema/v0/log.json): the meals, the person's own foods they name,
         and the meals the person deleted, for a server that keeps them. A server may add more of the
-        record beside them (Lifterclub adds the consent history, and the workouts with `workouts:read`).
-        Only `format=json` is part of this core. A server may limit how often it runs (Lifterclub: 10
-        an hour per account). If it fails part way the connection is cut, so an incomplete file never
+        record beside them.
+        Only `format=json` is part of this core. A server may limit how often it runs. If it fails part way the connection is cut, so an incomplete file never
         looks finished.
       tags: [Meals]
       security: [{oauth2: ['meals:read']}]
@@ -158,7 +154,7 @@ paths:
         and the serving becomes the default portion. `energy_kcal` is required. More than 900 kcal,
         or more than 100 g of protein, fat and carbohydrate, in 100 g is refused as numbers per
         serving typed as per 100 g. It's visible only to this user. If the user already has a food
-        by that name, it's returned unchanged (200). A server may limit how many (Lifterclub: 1,000).
+        by that name, it's returned unchanged (200). A server may limit how many.
       tags: [Foods]
       security: [{oauth2: ['meals:write']}]
       requestBody:
@@ -189,7 +185,7 @@ paths:
       summary: The user's meals on some days, or the meals change feed
       description: |
         Days are YYYY-MM-DD in the user's timezone, inclusive; both default to today. A server may
-        limit the span (Lifterclub: 92 days). Earliest first, with each day's totals, unless the
+        limit the span. Earliest first, with each day's totals, unless the
         person asked not to see numbers: then `days` is left out, and the meals and their items stay.
 
         With `updated_since`, this is the change feed: every meal whose stored record changed at or
@@ -269,7 +265,7 @@ paths:
     get:
       operationId: getMeal
       summary: One meal
-      description: An Open Food Log meal, with its totals unless the person asked not to see numbers (Lifterclub's calm mode).
+      description: An Open Food Log meal, with its totals unless the person asked not to see numbers.
       tags: [Meals]
       security: [{oauth2: ['meals:read']}]
       responses:
@@ -307,7 +303,7 @@ paths:
     delete:
       operationId: deleteMeal
       summary: Delete a meal
-      description: Restorable for a while with POST /v1/meals/{id}/restore (Lifterclub keeps it 10 minutes, and its export keeps deleted meals). A server may ask for no consent to delete.
+      description: Restorable for a while with POST /v1/meals/{id}/restore. A server may ask for no consent to delete.
       tags: [Meals]
       security: [{oauth2: ['meals:write']}]
       responses:
@@ -336,9 +332,9 @@ paths:
               schema: {$ref: "#/components/schemas/MealWritten"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
-        "422": {$ref: "#/components/responses/Unprocessable", description: "`undo_unavailable`: not deleted, or deleted too long ago (Lifterclub: 10 minutes)."}
+        "422": {$ref: "#/components/responses/Unprocessable", description: "`undo_unavailable`: not deleted, or deleted too long ago."}
         "429": {$ref: "#/components/responses/RateLimited"}
-      description: Undoes a delete within the time the server keeps it (Lifterclub's is 10 minutes); after that, `undo_unavailable`.
+      description: Undoes a delete within the time the server keeps it; after that, `undo_unavailable`.
   /v1/meals/{id}/items:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -429,7 +425,7 @@ paths:
         (https://openfoodlog.org/schema/v0/targets.json). Hiding numbers from the person doesn't
         hide them: they're the person's settings, and what's hidden is progress against them
         (`GET /v1/nutrition/summary`). `updated_at` is the latest change to any target, absent when
-        there are none. (Lifterclub never sets or suggests one.)
+        there are none.
       tags: [Meals]
       security: [{oauth2: ['meals:read']}]
       responses:
@@ -445,7 +441,7 @@ paths:
       operationId: setTargets
       summary: Replace the user's nutrition targets
       description: |
-        Replaces the whole list, in order (a server may cap its length; Lifterclub: 100). An entry
+        Replaces the whole list, in order (a server may cap its length). An entry
         with an `id` keeps it and must be one of the user's targets; one without gets a new one;
         targets left out are removed, so to change a target from some day on, end the old one with
         `effective_to` and add a new one. `effective_from` defaults to today in the user's timezone
@@ -474,8 +470,7 @@ paths:
       summary: Totals per day and how each target went
       description: |
         Each day's totals from `from` to `to` (inclusive, in the user's timezone; `to` defaults to
-        today and `from` to the six days before it; a server may limit the span, Lifterclub to 92
-        days), each target that applied to the day or to one of its meals with its status, per
+        today and `from` to the six days before it; a server may limit the span), each target that applied to the day or to one of its meals with its status, per
         target how many days or meals it applied to and was met, and the days at target: those
         where every target that applied was met.
 
@@ -487,7 +482,7 @@ paths:
         several targets apply, the one for some weekdays wins, then one for a meal type, then the
         latest `effective_from`, then the later entry.
 
-        When the person asked not to see numbers (Lifterclub's calm mode) it holds none:
+        When the person asked not to see numbers it holds none:
         `calm_mode` is true and each day has only its date and meal count.
       tags: [Meals]
       security: [{oauth2: ['meals:read']}]
@@ -509,16 +504,14 @@ paths:
       - name: id
         in: path
         required: true
-        description: A food ID, e.g. `ofc:bananas-raw`, one of the user's `usr:` foods, or (Lifterclub) a packaged product's barcode as `gtin:` with 8 to 14 digits.
+        description: "A food ID, e.g. `ofc:bananas-raw`, or one of the user's `usr:` foods."
         schema: {type: string}
     get:
       operationId: getFood
       summary: One food
       description: |
         A catalogue food with its portions, aliases and sources, or one of the user's own. A retired
-        catalogue food is still returned, since meals may name it. (Lifterclub also answers a
-        packaged product's barcode as a `gtin:` ID, looked up live at Open Food Facts, and 503 when
-        it can't be reached.)
+        catalogue food is still returned, since meals may name it.
       tags: [Foods]
       security: [{oauth2: ['meals:read']}]
       responses:
@@ -589,7 +582,7 @@ components:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
     Unprocessable:
-      description: "`nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      description: "`idempotency_conflict`, or `undo_unavailable` where an operation says so."
       content:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
@@ -610,16 +603,8 @@ components:
         status: {type: integer}
         detail: {type: string}
         code:
-          enum: [invalid_input, consent_required, nothing_to_log, parse_unsure, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error, photo_unread]
+          enum: [invalid_input, consent_required, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
         field: {type: string, description: For invalid_input.}
-        candidates:
-          type: array
-          description: For exercise_ambiguous.
-          items: {$ref: "#/components/schemas/Candidate"}
-        warnings:
-          type: array
-          description: For nothing_to_log and parse_unsure.
-          items: {$ref: "#/components/schemas/Warning"}
     BearerError:
       type: object
       required: [error]
@@ -657,17 +642,6 @@ components:
         webhooks:
           type: array
           items: {$ref: "#/components/schemas/MealWebhook"}
-    Candidate:
-      type: object
-      required: [id, name, measurement_type, is_custom, score]
-      properties:
-        id: {type: string}
-        name: {type: string}
-        measurement_type: {$ref: "#/components/schemas/MeasurementType"}
-        is_custom: {type: boolean}
-        score: {type: number}
-    MeasurementType:
-      enum: [weight_reps, reps, duration, distance_duration, assisted_weight_reps]
     OFLExport:
       description: The log as the Open Food Log core promises it, an OFL v0 log document (https://openfoodlog.org/schema/v0/log.json). A server may add more of the person's record beside its keys.
       type: object
@@ -692,12 +666,6 @@ components:
             properties:
               deleted_at: {type: string, format: date-time}
               meal: {$ref: "#/components/schemas/Meal"}
-    Warning:
-      type: object
-      required: [code]
-      properties:
-        code: {enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited]}
-        detail: {type: string}
     FoodAmount:
       description: "How much, in the measure the person used (OFL v0.1 section 6). Cups and spoons are portions; serving is the food's declared label serving."
       type: object
@@ -711,7 +679,7 @@ components:
       required: [text]
       properties:
         text: {type: string, maxLength: 200, description: "What the person called it. May be left empty with a food_id."}
-        food_id: {type: string, description: "A food from GET /v1/foods (Lifterclub: or a packaged product by its barcode as gtin:, looked up at Open Food Facts)."}
+        food_id: {type: string, description: "A food from GET /v1/foods."}
         amount: {$ref: "#/components/schemas/FoodAmount"}
         nutrients: {$ref: "#/components/schemas/FoodNutrients", description: For an item that names no food only.}
         share: {type: number, exclusiveMinimum: 0, maximum: 1, description: "For a dish shared with others, the person's part of amount (0.25 for a quarter); grams and nutrients are then their part. Not with nutrients."}
@@ -726,7 +694,7 @@ components:
         timezone: {type: string, description: "The IANA zone the person ate in (America/Chicago), which decides eaten_at's day. The user's own when left out."}
         logged_at: {type: string, format: date-time, description: "When the meal was recorded, for one logged elsewhere first. Now when left out."}
         meal_type: {type: string, enum: [breakfast, lunch, dinner, snack]}
-        label: {type: string, minLength: 1, maxLength: 80, description: "The person's own name for the occasion (pre-workout, iftar), beside or instead of meal_type."}
+        label: {type: string, minLength: 1, maxLength: 80, description: "The person's own name for the occasion (second breakfast, iftar), beside or instead of meal_type."}
         title: {type: string, maxLength: 200}
         notes: {type: string, maxLength: 2000}
         recorded_by: {type: string, enum: [person, professional, app], description: "Who recorded it: the person (the default), a professional on their behalf, or an app on its own."}
@@ -838,14 +806,14 @@ components:
               item_id: {type: string, format: uuid}
               text: {type: string}
               candidates: {type: array, items: {$ref: "#/components/schemas/FoodMatch"}}
-        totals: {$ref: "#/components/schemas/MealTotals", description: "Left out when the person asked not to see numbers (Lifterclub's calm mode)."}
+        totals: {$ref: "#/components/schemas/MealTotals", description: "Left out when the person asked not to see numbers."}
     MealList:
       type: object
       required: [meals]
       properties:
         meals: {type: array, items: {$ref: "#/components/schemas/Meal"}}
         days:
-          description: Each day's totals; left out when the person asked not to see numbers (Lifterclub's calm mode).
+          description: Each day's totals; left out when the person asked not to see numbers.
           type: array
           items:
             type: object
@@ -961,7 +929,7 @@ components:
       properties:
         from: {type: string, format: date}
         to: {type: string, format: date}
-        calm_mode: {type: boolean, description: "When true (the person asked not to see numbers: Lifterclub's calm mode), the summary holds no numbers but meal counts."}
+        calm_mode: {type: boolean, description: "When true, the person asked not to see numbers, so the summary holds no numbers but meal counts."}
         days:
           description: Every day from `from` to `to`, earliest first.
           type: array
@@ -1063,7 +1031,7 @@ components:
         ofl_version: {type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.1."}
         id: {type: string}
         name: {type: string}
-        kind: {type: string, enum: [generic, branded, custom], description: "branded: a packaged product (Lifterclub: from Open Food Facts, by its gtin: ID)."}
+        kind: {type: string, enum: [generic, branded, custom], description: "branded: a packaged product."}
         brand: {type: string}
         gtin: {type: array, items: {type: string, pattern: "^[0-9]{14}$"}}
         aliases:

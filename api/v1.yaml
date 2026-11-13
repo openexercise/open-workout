@@ -1646,7 +1646,7 @@ paths:
       operationId: setTargets
       x-ofl: core
       x-ofl-core-description: |
-        Replaces the whole list, in order (a server may cap its length; Lifterclub: 100). An entry
+        Replaces the whole list, in order (a server may cap its length). An entry
         with an `id` keeps it and must be one of the user's targets; one without gets a new one;
         targets left out are removed, so to change a target from some day on, end the old one with
         `effective_to` and add a new one. `effective_from` defaults to today in the user's timezone
@@ -1684,8 +1684,7 @@ paths:
       x-ofl: core
       x-ofl-core-description: |
         Each day's totals from `from` to `to` (inclusive, in the user's timezone; `to` defaults to
-        today and `from` to the six days before it; a server may limit the span, Lifterclub to 92
-        days), each target that applied to the day or to one of its meals with its status, per
+        today and `from` to the six days before it; a server may limit the span), each target that applied to the day or to one of its meals with its status, per
         target how many days or meals it applied to and was met, and the days at target: those
         where every target that applied was met.
 
@@ -1774,7 +1773,7 @@ paths:
       - name: id
         in: path
         required: true
-        description: A food ID, e.g. `ofc:bananas-raw`, one of the user's `usr:` foods, or (Lifterclub) a packaged product's barcode as `gtin:` with 8 to 14 digits.
+        description: "A food ID, e.g. `ofc:bananas-raw`, or one of the user's `usr:` foods (Lifterclub: or a packaged product's barcode as `gtin:` with 8 to 14 digits)."
         schema: { type: string }
     get:
       operationId: getFood
@@ -2251,6 +2250,8 @@ components:
           schema: { $ref: "#/components/schemas/Problem" }
     Unprocessable:
       description: "`nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      x-ows-core-description: "`exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      x-ofl-core-description: "`idempotency_conflict`, or `undo_unavailable` where an operation says so."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
@@ -2289,14 +2290,19 @@ components:
         detail: { type: string }
         code:
           enum: [invalid_input, consent_required, nothing_to_log, parse_unsure, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error, photo_unread]
+          x-ows-core-enum: [invalid_input, consent_required, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
+          x-ofl-core-enum: [invalid_input, consent_required, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
         field: { type: string, description: For invalid_input. }
         candidates:
           type: array
           description: For exercise_ambiguous.
           items: { $ref: "#/components/schemas/Candidate" }
+          x-ofl-core: false
         warnings:
           type: array
           description: For nothing_to_log and parse_unsure.
+          x-ows-core: false
+          x-ofl-core: false
           items: { $ref: "#/components/schemas/Warning" }
     BearerError:
       type: object
@@ -2334,10 +2340,10 @@ components:
           type: array
           description: Workouts deleted since `updated_since`, when `include_deleted` was asked for.
           items: { $ref: "#/components/schemas/Tombstone" }
-        totals: { $ref: "#/components/schemas/Totals" }
+        totals: { $ref: "#/components/schemas/Totals", x-ows-core: false }
         truncated: { type: boolean, description: More workouts follow; pass next_cursor. }
         next_cursor: { type: string }
-        summary: { type: string }
+        summary: { type: string, x-ows-core: false }
     MealWebhookInput:
       type: object
       required: [url, events]
@@ -2480,17 +2486,19 @@ components:
       required: [workout, summary, new_records, needs_confirmation]
       properties:
         workout: { $ref: "#/components/schemas/Workout" }
-        summary: { type: string, description: One line to show the user. }
+        summary: { type: string, description: One line to show the user., x-ows-core: false }
         new_records:
           type: array
           items: { $ref: "#/components/schemas/Record" }
+          x-ows-core: false
         needs_confirmation:
           type: array
           items: { $ref: "#/components/schemas/Confirmation" }
         replayed: { type: boolean }
-        parse_method: { type: string, description: "How text was read, for a write made from text: llm or fallback." }
+        parse_method: { type: string, description: "How text was read, for a write made from text: llm or fallback.", x-ows-core: false }
         warnings:
           type: array
+          x-ows-core: false
           description: For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out.
           items: { $ref: "#/components/schemas/Warning" }
     Record:
@@ -2541,7 +2549,8 @@ components:
         records_changed:
           type: array
           items: { $ref: "#/components/schemas/Record" }
-        summary: { type: string }
+          x-ows-core: false
+        summary: { type: string, x-ows-core: false }
 
     Draft:
       type: object
@@ -3364,7 +3373,7 @@ components:
         timezone: { type: string, description: "The IANA zone the person ate in (America/Chicago), which decides eaten_at's day. The user's own when left out." }
         logged_at: { type: string, format: date-time, description: "When the meal was recorded, for one logged elsewhere first. Now when left out." }
         meal_type: { type: string, enum: [breakfast, lunch, dinner, snack] }
-        label: { type: string, minLength: 1, maxLength: 80, description: "The person's own name for the occasion (pre-workout, iftar), beside or instead of meal_type." }
+        label: { type: string, minLength: 1, maxLength: 80, description: "The person's own name for the occasion (second breakfast, iftar), beside or instead of meal_type." }
         title: { type: string, maxLength: 200 }
         notes: { type: string, maxLength: 2000 }
         recorded_by: { type: string, enum: [person, professional, app], description: "Who recorded it: the person (the default), a professional on their behalf, or an app on its own." }
@@ -3692,7 +3701,7 @@ components:
       properties:
         from: { type: string, format: date }
         to: { type: string, format: date }
-        calm_mode: { type: boolean, description: "When true (the person asked not to see numbers: Lifterclub's calm mode), the summary holds no numbers but meal counts." }
+        calm_mode: { type: boolean, description: "When true, the person asked not to see numbers (Lifterclub's calm mode), so the summary holds no numbers but meal counts." }
         days:
           description: Every day from `from` to `to`, earliest first.
           type: array
@@ -3958,7 +3967,7 @@ components:
         calories: { type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them." }
         heart_rate_bpm: { type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it." }
         warmup: { type: boolean, description: "The same as type warmup. Warm-ups don't count toward records." }
-        estimated: { type: boolean, description: "The values were inferred (e.g. read from a photo), not stated." }
+        estimated: { type: boolean, description: "The values were inferred, not stated: read off a machine's screen, say." }
     ExerciseInput:
       type: object
       required: [sets]
