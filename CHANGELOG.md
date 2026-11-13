@@ -14,10 +14,6 @@ module in `clients/go`). The schema itself is the v0 draft; its own changes are 
 
 Known gaps and deferred work, removed when it ships (and recorded under Unreleased).
 
-- **Publish TypeScript client 0.5.0 to npm.** `clients-ts-v0.5.0` is tagged on #18's merge, but
-  the publish workflow got `404` from npm: set up trusted publishing for
-  `@openexercise/open-workout-client` on npmjs.com (this repository, `publish-client.yml`), then
-  re-run the workflow.
 - **Go client changes since `clients/go/v0.1.0`** (the workout's local day, #17, and #18's fields)
   are untagged.
 - **v1:** freezes when the first application outside Lifterclub writes the schema in production;
@@ -30,12 +26,12 @@ Merged since the last client tags.
 
 ### Added
 
-- **Lifterclub's changes since 2026-11-05, published** (#18): TypeScript client 0.5.0 with an
+- **Lifterclub's changes since 2026-11-05, published** (#18): TypeScript client 0.5.0 (on npm,
+  tag `clients-ts-v0.5.0`) with an
   `/openfoodlog` entry; the API cores take OWS documents as they are; the Go client's
   `SetInput.Type`, `WorkoutInput.Estimates` and `LogDocument`. **Breaking** for core-only clients
   (mightydotrun/lifterclub#140): writes, deletes and lists lose Lifterclub's own fields (`summary`,
   `new_records`, `warnings`, `totals` and others), and `Problem` loses three codes.
-
 - `routine.json` (a person's routine: exercise rows with optional targets and a rule) and
   `log.json` (a whole log as one file); the API core's export returns a log document (#12).
 - `mcp/template`: a Go MCP server for the core profile with an in-memory store, its own module (#13).
