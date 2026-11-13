@@ -2,6 +2,8 @@
 
 Open an issue or pull request. Run `go run ./cmd/ows validate` and `go test ./...` first; a change to a schema needs a changelog entry and the examples still valid. Until v1 the schema and the tool profile are published here from the reference implementation, so a change starts as an issue or proposal in this repository, is agreed here, and then lands in the next published version with a changelog entry.
 
+Every change someone would notice adds an entry under `Unreleased` in [CHANGELOG.md](CHANGELOG.md) in the same pull request, and keeps its `Still to do` list current: add what you leave undone, remove what ships.
+
 ## Proposing a change
 
 1. Say what real workouts or clients the change would serve, with an example document.

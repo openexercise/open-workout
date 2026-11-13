@@ -1,0 +1,95 @@
+# Changelog
+
+The running record of this repository: the Open Workout Schema, the MCP tool profile and its template
+server, the API core, the conformance suite, and the Go and TypeScript clients. Until v1 the
+schema, profile, API documents and clients are published here from Lifterclub, the reference
+implementation (`scripts/publish-openworkout.sh` there).
+
+Versions follow semantic versioning and are released per client, as git tags: `clients-ts-vX.Y.Z`
+(version file `clients/ts/package.json`; the tag publishes to npm) and `clients/go/vX.Y.Z` (the Go
+module in `clients/go`). The schema itself is the v0 draft; its own changes are in
+[`schema/CHANGELOG.md`](schema/CHANGELOG.md). `git log` has the detail.
+
+## Still to do
+
+Known gaps and deferred work, removed when it ships (and recorded under Unreleased).
+
+- **Go client changes since `clients/go/v0.1.0`** (the workout's local day, #17, and #18's fields)
+  are untagged.
+- **v1:** freezes when the first application outside Lifterclub writes the schema in production;
+  after that changes are additive, through RFCs ([README.md](README.md),
+  [`schema/CHANGELOG.md`](schema/CHANGELOG.md)).
+
+## Unreleased
+
+Merged since the last client tags.
+
+### Added
+
+- **Lifterclub's changes since 2026-11-05, published** (#18): TypeScript client 0.5.0 (on npm,
+  tag `clients-ts-v0.5.0`) with an
+  `/openfoodlog` entry; the API cores take OWS documents as they are; the Go client's
+  `SetInput.Type`, `WorkoutInput.Estimates` and `LogDocument`. **Breaking** for core-only clients
+  (mightydotrun/lifterclub#140): writes, deletes and lists lose Lifterclub's own fields (`summary`,
+  `new_records`, `warnings`, `totals` and others), and `Problem` loses three codes.
+- `routine.json` (a person's routine: exercise rows with optional targets and a rule) and
+  `log.json` (a whole log as one file); the API core's export returns a log document (#12).
+- `mcp/template`: a Go MCP server for the core profile with an in-memory store, its own module (#13).
+  It now also serves the API core at `/v1` (workouts, undo, change feed with tombstones, export,
+  search, signed webhooks) and passes `ows conformance`, with an example partner app and quickstarts
+  (#16).
+- The MCP README's "What an AI client keeps to", and the reference server's extension tool
+  `match_exercises` (#14).
+- Conformance: `change-feed`, `tombstone` and `webhooks` REST checks, `ows conformance mcp`,
+  `ows vectors` for the progression vectors, and `webhook-signature-vectors.json` with
+  `conformance.Sign`/`VerifySignature` (#15).
+- A workout's local `date` and IANA `timezone`; the Go client reads both and sends `timezone` (#17).
+
+### Changed
+
+- **Breaking:** the MCP profile splits into a core and extensions (`dev.openworkout/profile` in each
+  tool's `_meta`), and `error_codes` becomes a list of `{code, profile, meaning}` (#13).
+- `success: total_reps` decides short as well as done on `linear` and `increment_table` (#12).
+
+## clients/go/v0.1.0 — 2026-11-04
+
+The Open Workout API core and neutral clients (#11). The TypeScript client became
+`@openexercise/open-workout-client` 0.4.0, published to npm by hand on 2026-11-05 (a new package
+name), so it has no tag.
+
+- **Added:** `api/core.yaml`, the routes any Open Workout server serves (workouts, sets and entries,
+  undo, change feed, export, webhooks, exercise search); `api/v1.yaml` is Lifterclub's whole API.
+- **Added:** the Go client as package `openworkout`, a module of its own.
+- **Changed:** webhooks are signed in `OWS-Signature`, with `OWS-Event` and `OWS-Delivery`.
+- **Changed:** the TypeScript client serves the core at its root and Lifterclub's API at
+  `/lifterclub`.
+
+## clients-ts-v0.3.0 — 2026-11-04
+
+- **Added:** StrongLifts, Texas Method and Madcow progressions in `program.json`: `stages` on a
+  `linear` rule, the `percent_of_slot` load and percentage increments, with 11 more vectors (#10).
+- **Added:** program targets carry `start_key` in `api/v1.yaml` (#10).
+
+## clients-ts-v0.2.0 — 2026-11-04
+
+- **Added:** progression rules in `program.json` (`linear`, `double`, `increment_table`, `stages`,
+  `variations`), training-max progressions and `progression-vectors.json` (#8).
+- **Changed (breaking for v0 documents):** the `last_plus` load is now `last` with a `linear` rule
+  (#8).
+- **Changed:** per-app limits of 1,200 reads and 120 writes a minute (#7).
+- **Added:** GOVERNANCE.md, CODE_OF_CONDUCT.md and SECURITY.md (#7).
+- **Fixed:** the site serves the progression vectors as a file, not a schema (#9).
+
+## clients-ts-v0.1.1 — 2026-11-04
+
+The first tagged release, and everything before it.
+
+- **Added:** Open Workout Schema v0 (workout, program), the MCP tool profile, `ows validate`,
+  examples and the openworkout.dev site (2026-11-01).
+- **Added:** a workout's `updated_at` (2026-11-02), and a set's `calories` and `heart_rate_bpm`
+  (#1).
+- **Added:** `ows conformance <base-url>` and the `conformance` package, checking a server's REST API
+  (#3).
+- **Added:** `api/v1.yaml` and the Go and TypeScript clients (#4); the TypeScript client released to
+  npm as `@openexercise/lifterclub-client` from a `clients-ts-v*` tag, with trusted publishing (#5,
+  #6).
