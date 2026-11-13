@@ -3118,7 +3118,11 @@ export interface components {
             calories?: number;
             /** @description Average heart rate over the set, in beats per minute. */
             heart_rate_bpm?: number;
+        } & {
+            [key: string]: unknown;
         };
+        /** @description The Open Workout Schema version the document was written to, as MAJOR.MINOR ("0.1"). A document without one is 0.0, the drafts before versions were numbered (SPEC.md, section 8). */
+        ows_version: string;
         /** @description Provenance: where the record came from. */
         source: {
             /** @enum {unknown} */
@@ -3137,6 +3141,8 @@ export interface components {
             text?: string;
             notes?: string;
             sets: components["schemas"]["set"][];
+        } & {
+            [key: string]: unknown;
         };
         /**
          * Open Workout Schema v0: workout
@@ -3145,6 +3151,7 @@ export interface components {
         workout: {
             /** @constant */
             $schema?: "https://openworkout.dev/schema/v0/workout.json";
+            ows_version?: components["schemas"]["ows_version"];
             /** @description Assigned by the server that stores the workout. */
             id?: string;
             /**
@@ -3183,6 +3190,8 @@ export interface components {
             };
             /** @description JSON pointers (RFC 6901) to values that were inferred or assumed rather than given. */
             estimates?: string[];
+        } & {
+            [key: string]: unknown;
         };
         exerciseRef: {
             /** @description An Open Exercise Catalogue ID (oec:…). */
@@ -3274,12 +3283,16 @@ export interface components {
             rest_seconds?: number;
             substitutes?: components["schemas"]["exerciseRef"][];
             notes?: string;
+        } & {
+            [key: string]: unknown;
         };
         day: {
             /** @description Stable within a version; what a link to this day names. */
             key: string;
             name: string;
             slots: components["schemas"]["slot"][];
+        } & {
+            [key: string]: unknown;
         };
         week: {
             days: components["schemas"]["day"][];
@@ -3291,12 +3304,16 @@ export interface components {
         program: {
             /** @constant */
             $schema: "https://openworkout.dev/schema/v0/program.json";
+            /** @description The Open Workout Schema version the document was written to, as MAJOR.MINOR (SPEC.md, section 8). */
+            ows_version?: string;
             /** @description How the days fall across a week, in words. */
             schedule?: string;
             /** @description How the targets change over time, in words. */
             progression: string;
             /** @description The weeks of one cycle, repeating. */
             weeks: components["schemas"]["week"][];
+        } & {
+            [key: string]: unknown;
         };
         /** @description How the row's next weight is suggested; absent means the server's default for the row's shape. linear adds the increment when every set reaches reps_min; double works up the rep range, then adds it. off makes no suggestion. */
         rule: {
@@ -3327,6 +3344,8 @@ export interface components {
             rest_seconds?: number;
             notes?: string;
             progression?: components["schemas"]["rule"];
+        } & {
+            [key: string]: unknown;
         };
         /**
          * Open Workout Schema v0: routine
@@ -3335,6 +3354,8 @@ export interface components {
         routine: {
             /** @constant */
             $schema?: "https://openworkout.dev/schema/v0/routine.json";
+            /** @description The Open Workout Schema version the document was written to, as MAJOR.MINOR (SPEC.md, section 8). */
+            ows_version?: string;
             /** @description Assigned by the server that stores the routine. */
             id?: string;
             name: string;
@@ -3349,6 +3370,8 @@ export interface components {
                 version: number;
             };
             exercises: components["schemas"]["row"][];
+        } & {
+            [key: string]: unknown;
         };
         /**
          * Open Workout Schema v0: log
@@ -3357,6 +3380,8 @@ export interface components {
         log: {
             /** @constant */
             $schema?: "https://openworkout.dev/schema/v0/log.json";
+            /** @description The Open Workout Schema version the document was written to, as MAJOR.MINOR (SPEC.md, section 8). */
+            ows_version?: string;
             /** Format: date-time */
             exported_at: string;
             /** @description Every workout in the log, newest first. */

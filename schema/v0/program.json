@@ -6,8 +6,10 @@
   "type": "object",
   "required": ["$schema", "progression", "weeks"],
   "additionalProperties": false,
+  "patternProperties": { "^x-": {} },
   "properties": {
     "$schema": { "const": "https://openworkout.dev/schema/v0/program.json" },
+    "ows_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$", "description": "The Open Workout Schema version the document was written to, as MAJOR.MINOR (SPEC.md, section 8)." },
     "schedule": { "type": "string", "description": "How the days fall across a week, in words." },
     "progression": { "type": "string", "description": "How the targets change over time, in words." },
     "weeks": {
@@ -30,6 +32,7 @@
       "type": "object",
       "required": ["key", "name", "slots"],
       "additionalProperties": false,
+      "patternProperties": { "^x-": {} },
       "properties": {
         "key": { "type": "string", "description": "Stable within a version; what a link to this day names." },
         "name": { "type": "string" },
@@ -40,6 +43,7 @@
       "type": "object",
       "required": ["exercise", "sets", "load"],
       "additionalProperties": false,
+      "patternProperties": { "^x-": {} },
       "properties": {
         "exercise": { "$ref": "#/$defs/exerciseRef" },
         "sets": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/setGroup" } },

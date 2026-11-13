@@ -20,7 +20,10 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
-Nothing yet.
+- **Schema 0.1:** versions, extension members and a prose specification (`schema/v0/SPEC.md`).
+  Workouts, routines, programs and logs gain `ows_version`; workouts, entries, sets, routines, rows,
+  programs, days and slots allow `x-<vendor>-…` members. The Go client's `Workout` reads
+  `ows_version`. Additive ([`schema/CHANGELOG.md`](schema/CHANGELOG.md)).
 
 ## clients/go/v0.2.0 and clients-ts-v0.5.0 — 2026-11-13
 

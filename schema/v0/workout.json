@@ -6,8 +6,10 @@
   "type": "object",
   "required": ["started_at", "source", "exercises"],
   "additionalProperties": false,
+  "patternProperties": { "^x-": {} },
   "properties": {
     "$schema": { "const": "https://openworkout.dev/schema/v0/workout.json" },
+    "ows_version": { "$ref": "#/$defs/ows_version" },
     "id": { "type": "string", "description": "Assigned by the server that stores the workout." },
     "started_at": { "type": "string", "format": "date-time", "description": "When the workout started. Listed in estimates as /started_at when it was worked out (from a day alone, or the time it was logged) rather than given: trust its day, not its hour." },
     "ended_at": { "type": "string", "format": "date-time" },
@@ -52,6 +54,11 @@
     }
   },
   "$defs": {
+    "ows_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "The Open Workout Schema version the document was written to, as MAJOR.MINOR (\"0.1\"). A document without one is 0.0, the drafts before versions were numbered (SPEC.md, section 8)."
+    },
     "source": {
       "description": "Provenance: where the record came from.",
       "type": "object",
@@ -68,6 +75,7 @@
       "type": "object",
       "required": ["exercise", "sets"],
       "additionalProperties": false,
+      "patternProperties": { "^x-": {} },
       "properties": {
         "id": { "type": "string", "description": "Assigned by the server; used to edit the entry." },
         "exercise": { "$ref": "#/$defs/exercise" },
@@ -93,6 +101,7 @@
     "set": {
       "type": "object",
       "additionalProperties": false,
+      "patternProperties": { "^x-": {} },
       "properties": {
         "id": { "type": "string", "description": "Assigned by the server; used to edit the set." },
         "type": { "enum": ["working", "warmup", "backoff", "amrap", "failure", "drop"], "default": "working" },

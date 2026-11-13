@@ -7,6 +7,7 @@
   "required": ["exported_at", "workouts"],
   "properties": {
     "$schema": { "const": "https://openworkout.dev/schema/v0/log.json" },
+    "ows_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$", "description": "The Open Workout Schema version the document was written to, as MAJOR.MINOR (SPEC.md, section 8)." },
     "exported_at": { "type": "string", "format": "date-time" },
     "workouts": {
       "description": "Every workout in the log, newest first.",
