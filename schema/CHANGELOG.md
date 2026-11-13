@@ -6,6 +6,22 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-12: The API core holds Open Workout alone. A write's `summary`, `new_records`,
+  `parse_method` and `warnings`, a delete's `records_changed` and `summary`, and a list's `totals`
+  and `summary` were required of every server and are now the reference server's own, with the
+  personal records and totals behind them; so are the sentence parser's and photo error codes
+  (`nothing_to_log`, `parse_unsure`, `photo_unread`) and warnings, and its notes in the prose. A
+  problem's `code` in the core is one of `invalid_input`, `consent_required`, `exercise_ambiguous`,
+  `not_found`, `undo_unavailable`, `rate_limited`, `idempotency_conflict`, `unauthenticated` and
+  `internal_error`. Breaking for a client that relied on those members from any server; the
+  reference server still sends them.
+- 2026-11-12: The API core's workout write takes what an OWS workout document holds, so an app
+  can post one as it is: a set's `type` (all six, where only `warmup` could be written), a load
+  as `{value, unit}` beside the plain number, an entry's `exercise` `{id, name}` and `text`,
+  `estimates` as JSON pointers (a set or a value in one, a set's `/load/unit`, `/started_at`), and
+  `source.external_id`. Members a server assigns (IDs, `updated_at`, `merged_sources`, `source`'s
+  `kind` and `client`, an exercise's `match`, a program label's `name`, `day_name` and `listed`) are
+  accepted and ignored. The documents are unchanged; additive for writers.
 - 2026-11-12: A workout carries its local day. `date` is the day it happened on (`started_at` in
   `timezone`), and `timezone` is the IANA zone it happened in, as Open Food Log meals have them, so
   an evening workout in Chicago isn't filed under the next day by a reader in UTC. `started_at` is

@@ -321,12 +321,9 @@ paths:
       summary: Download the whole log
       description: |
         Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
-        and a server may add more of the record beside them (Lifterclub adds the routines, program
-        runs, imports, consent history and the workouts the person deleted, so the file answers an
-        access request in full, and the profile if the credential has `profile:read`). `csv` has one
-        row per set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
-        don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
-        an hour per account). If it fails part way the connection is cut, so an incomplete file never
+        and a server may add more of the record beside them. `csv` has one row per set, and
+        needs `workouts:read`; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
+        don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs. If it fails part way the connection is cut, so an incomplete file never
         looks finished.
       tags: [Workouts]
       security: [{oauth2: ['workouts:read']}]
@@ -450,7 +447,7 @@ components:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
     Unprocessable:
-      description: "`nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
+      description: "`exercise_ambiguous` (with `candidates`) or `idempotency_conflict`."
       content:
         application/problem+json:
           schema: {$ref: "#/components/schemas/Problem"}
@@ -465,6 +462,8 @@ components:
     Workout:
       # Relative, so the spec works offline and in code generators; published alongside it.
       $ref: "../schema/v0/workout.json"
+    Load:
+      $ref: "../schema/v0/workout.json#/$defs/load"
     MatchStatus:
       description: catalogue and custom are confirmed; close and unmatched need confirmation.
       enum: [catalogue, close, custom, unmatched]
@@ -482,16 +481,12 @@ components:
         status: {type: integer}
         detail: {type: string}
         code:
-          enum: [invalid_input, consent_required, nothing_to_log, parse_unsure, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
+          enum: [invalid_input, consent_required, exercise_ambiguous, not_found, undo_unavailable, rate_limited, idempotency_conflict, unauthenticated, internal_error]
         field: {type: string, description: For invalid_input.}
         candidates:
           type: array
           description: For exercise_ambiguous.
           items: {$ref: "#/components/schemas/Candidate"}
-        warnings:
-          type: array
-          description: For nothing_to_log and parse_unsure.
-          items: {$ref: "#/components/schemas/Warning"}
     BearerError:
       type: object
       required: [error]
@@ -500,7 +495,7 @@ components:
         error_description: {type: string}
     WorkoutList:
       type: object
-      required: [workouts, totals, truncated, summary]
+      required: [workouts, truncated]
       properties:
         from: {$ref: "#/components/schemas/Date", description: First day listed; absent in the change feed.}
         to: {$ref: "#/components/schemas/Date", description: Last day listed; absent in the change feed.}
@@ -513,10 +508,8 @@ components:
           type: array
           description: Workouts deleted since `updated_since`, when `include_deleted` was asked for.
           items: {$ref: "#/components/schemas/Tombstone"}
-        totals: {$ref: "#/components/schemas/Totals"}
         truncated: {type: boolean, description: More workouts follow; pass next_cursor.}
         next_cursor: {type: string}
-        summary: {type: string}
     WebhookInput:
       type: object
       required: [url, events]
@@ -557,49 +550,16 @@ components:
         deleted_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
         merged_into: {type: string, description: "The workout it was merged into, when another app's record of the same session absorbed it."}
-    Totals:
-      type: object
-      description: Working sets on this page.
-      required: [workouts, sets, volume, unit]
-      properties:
-        workouts: {type: integer}
-        sets: {type: integer}
-        volume: {type: number, description: Sum of load × reps.}
-        unit: {$ref: "#/components/schemas/Unit"}
     Logged:
       type: object
       description: The result of a write.
-      required: [workout, summary, new_records, needs_confirmation]
+      required: [workout, needs_confirmation]
       properties:
         workout: {$ref: "#/components/schemas/Workout"}
-        summary: {type: string, description: One line to show the user.}
-        new_records:
-          type: array
-          items: {$ref: "#/components/schemas/Record"}
         needs_confirmation:
           type: array
           items: {$ref: "#/components/schemas/Confirmation"}
         replayed: {type: boolean}
-        parse_method: {type: string, description: "How text was read, for a write made from text: llm or fallback."}
-        warnings:
-          type: array
-          description: For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out.
-          items: {$ref: "#/components/schemas/Warning"}
-    Record:
-      type: object
-      description: A personal record the write changed.
-      required: [exercise_id, exercise_name, kind, value, unit, set_id]
-      properties:
-        exercise_id: {type: string}
-        exercise_name: {type: string}
-        kind: {$ref: "#/components/schemas/RecordKind"}
-        value: {type: number}
-        unit: {$ref: "#/components/schemas/Unit"}
-        previous: {type: number, description: Absent for a first record.}
-        set_id: {type: string, format: uuid}
-        removed: {type: boolean, description: No set qualifies any more; value is 0.}
-    RecordKind:
-      enum: [heaviest_load, best_e1rm, best_set_volume]
     Confirmation:
       type: object
       description: An exercise to confirm with the user, then fix with PATCH /v1/entries/{entry_id}.
@@ -624,16 +584,12 @@ components:
       enum: [weight_reps, reps, duration, distance_duration, assisted_weight_reps]
     Deleted:
       type: object
-      required: [kind, id, undo_token, undo_expires_at, records_changed, summary]
+      required: [kind, id, undo_token, undo_expires_at]
       properties:
         kind: {enum: [workout, exercise, set]}
         id: {type: string, format: uuid}
         undo_token: {type: string}
         undo_expires_at: {type: string, format: date-time}
-        records_changed:
-          type: array
-          items: {$ref: "#/components/schemas/Record"}
-        summary: {type: string}
     OWSExport:
       description: The log as the Open Workout core promises it, an OWS v0 log document (https://openworkout.dev/schema/v0/log.json). A server may add more of the person's record beside its keys.
       $ref: "../schema/v0/log.json"
@@ -644,12 +600,9 @@ components:
         id: {type: string}
         version: {type: integer}
         day: {type: string}
-    Warning:
-      type: object
-      required: [code]
-      properties:
-        code: {enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited]}
-        detail: {type: string}
+        listed: {type: boolean, description: "An OWS workout's program label. Ignored."}
+        name: {type: string, description: "An OWS workout's program label. Ignored."}
+        day_name: {type: string, description: "An OWS workout's program label. Ignored."}
     ExerciseMatch:
       type: object
       required: [id, name, measurement_type, equipment, primary_muscles, is_custom, score]
@@ -663,23 +616,40 @@ components:
         score: {type: number}
     SetInput:
       type: object
+      description: "A set as a client describes it, or as an OWS workout document has it."
       properties:
+        id: {type: string, description: "A stored set's ID, as an OWS document carries it. Ignored."}
+        type: {enum: [working, warmup, backoff, amrap, failure, drop], description: "The OWS set type; working when left out. Only warm-ups are left out of records."}
         reps: {type: integer, minimum: 0, maximum: 1000}
-        load: {type: number, minimum: 0, description: Leave out for bodyweight.}
+        load:
+          description: "Leave out for bodyweight. A number with unit beside it, or an OWS load {value, unit}."
+          oneOf:
+            - {type: number, minimum: 0}
+            - {$ref: "#/components/schemas/Load"}
         unit: {$ref: "#/components/schemas/Unit", description: Leave out for the user's unit.}
         rpe: {type: number, minimum: 1, maximum: 10}
         duration_s: {type: integer, minimum: 0}
         distance_m: {type: number, minimum: 0}
         calories: {type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them."}
         heart_rate_bpm: {type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it."}
-        warmup: {type: boolean, description: Warm-ups don't count toward records.}
-        estimated: {type: boolean, description: "The values were inferred (e.g. read from a photo), not stated."}
+        warmup: {type: boolean, description: "The same as type warmup. Warm-ups don't count toward records."}
+        estimated: {type: boolean, description: "The values were inferred, not stated: read off a machine's screen, say."}
     ExerciseInput:
       type: object
       required: [sets]
+      description: "One exercise and its sets: name and exercise_id, or an OWS entry's exercise and text."
       properties:
+        id: {type: string, description: "A stored entry's ID, as an OWS document carries it. Ignored."}
         name: {type: string, description: The exercise as the user named it.}
         exercise_id: {type: string, description: "A catalogue or custom ID, when known; skips matching."}
+        exercise:
+          type: object
+          description: "An OWS entry's exercise. Its id is exercise_id; its name is used when neither name nor text is given; match is the server's and ignored."
+          properties:
+            id: {type: [string, "null"]}
+            name: {type: string}
+            match: {type: string}
+        text: {type: string, description: "An OWS entry's text: what the person called the exercise. Used as name when name isn't given."}
         sets:
           type: array
           minItems: 1
@@ -689,9 +659,15 @@ components:
     WorkoutInput:
       type: object
       required: [exercises]
+      description: "A workout to log. An OWS workout document can be posted as it is: the members the server assigns (id, updated_at, merged_sources, source's kind and client, entries' and sets' id, an exercise's match, a program label's name, day_name and listed) are ignored."
       properties:
+        $schema: {const: "https://openworkout.dev/schema/v0/workout.json"}
+        id: {type: string, description: "A stored workout's ID, as an OWS document carries it. Ignored."}
+        updated_at: {type: string, format: date-time, description: "Ignored: the server's clock sets it."}
+        merged_sources: {type: array, items: {type: object}, description: "Ignored: merges are the server's."}
         started_at: {type: string, format: date-time}
-        date: {$ref: "#/components/schemas/Date", description: "Day in the user's timezone, when started_at is not given. Default today."}
+        date: {$ref: "#/components/schemas/Date", description: "Day in the workout's timezone, when started_at is not given. Default today. The start is then worked out and listed in estimates as /started_at."}
+        timezone: {type: string, description: "The IANA time zone the workout happened in (America/Chicago), which decides its local day. Default the person's."}
         title: {type: string}
         notes: {type: string}
         exercises:
@@ -700,6 +676,17 @@ components:
           maxItems: 50
           items: {$ref: "#/components/schemas/ExerciseInput"}
         program: {$ref: "#/components/schemas/ProgramRef"}
+        source:
+          type: object
+          description: "An OWS document's source. Its external_id is read as external_id; kind and client come from your credential."
+          properties:
+            kind: {type: string}
+            client: {type: string}
+            external_id: {type: [string, "null"]}
+        estimates:
+          type: array
+          description: "JSON pointers (RFC 6901) into this body to values you inferred rather than were told: a set, or a value in one (the set is marked), a set's /load/unit (the unit was assumed), or /started_at."
+          items: {type: string}
         external_id: {type: string, maxLength: 200, description: "Your app's own ID for this workout. A second POST with the same ID replays the first (200, `Idempotent-Replayed: true`) instead of logging twice; one the person has since deleted here answers 404 and stays deleted. Not for the web app."}
     WorkoutPatch:
       type: object

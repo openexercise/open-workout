@@ -202,12 +202,9 @@ export interface paths {
         /**
          * Download the whole log
          * @description Every workout in the log, newest first, as a file. `json` holds Open Workout Schema workouts,
-         *     and a server may add more of the record beside them (Lifterclub adds the routines, program
-         *     runs, imports, consent history and the workouts the person deleted, so the file answers an
-         *     access request in full, and the profile if the credential has `profile:read`). `csv` has one
-         *     row per set; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
-         *     don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs (Lifterclub: 10
-         *     an hour per account). If it fails part way the connection is cut, so an incomplete file never
+         *     and a server may add more of the record beside them. `csv` has one row per set, and
+         *     needs `workouts:read`; free text starting with `=`, `+`, `-` or `@` gets a leading `'`, so spreadsheets
+         *     don't run it. Deleted workouts aren't in `workouts` or the CSV. A server may limit how often it runs. If it fails part way the connection is cut, so an incomplete file never
          *     looks finished.
          */
         get: operations["exportLog"];
@@ -241,6 +238,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Workout: components["schemas"]["workout"];
+        Load: components["schemas"]["load"];
         /**
          * @description catalogue and custom are confirmed; close and unmatched need confirmation.
          * @enum {unknown}
@@ -257,13 +255,11 @@ export interface components {
             status: number;
             detail?: string;
             /** @enum {unknown} */
-            code: "invalid_input" | "consent_required" | "nothing_to_log" | "parse_unsure" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error";
+            code: "invalid_input" | "consent_required" | "exercise_ambiguous" | "not_found" | "undo_unavailable" | "rate_limited" | "idempotency_conflict" | "unauthenticated" | "internal_error";
             /** @description For invalid_input. */
             field?: string;
             /** @description For exercise_ambiguous. */
             candidates?: components["schemas"]["Candidate"][];
-            /** @description For nothing_to_log and parse_unsure. */
-            warnings?: components["schemas"]["Warning"][];
         };
         BearerError: {
             /** @enum {unknown} */
@@ -285,11 +281,9 @@ export interface components {
             updated_since?: string;
             /** @description Workouts deleted since `updated_since`, when `include_deleted` was asked for. */
             deleted?: components["schemas"]["Tombstone"][];
-            totals: components["schemas"]["Totals"];
             /** @description More workouts follow; pass next_cursor. */
             truncated: boolean;
             next_cursor?: string;
-            summary: string;
         };
         WebhookInput: {
             /** @description An https URL on a public host, with no credentials. Checked again on every delivery, on the address actually reached. */
@@ -328,43 +322,12 @@ export interface components {
             /** @description The workout it was merged into, when another app's record of the same session absorbed it. */
             merged_into?: string;
         };
-        /** @description Working sets on this page. */
-        Totals: {
-            workouts: number;
-            sets: number;
-            /** @description Sum of load × reps. */
-            volume: number;
-            unit: components["schemas"]["Unit"];
-        };
         /** @description The result of a write. */
         Logged: {
             workout: components["schemas"]["workout"];
-            /** @description One line to show the user. */
-            summary: string;
-            new_records: components["schemas"]["Record"][];
             needs_confirmation: components["schemas"]["Confirmation"][];
             replayed?: boolean;
-            /** @description How text was read, for a write made from text: llm or fallback. */
-            parse_method?: string;
-            /** @description For a write made from text. A `value_dropped` warning names a field the text didn't support, which was left out. */
-            warnings?: components["schemas"]["Warning"][];
         };
-        /** @description A personal record the write changed. */
-        Record: {
-            exercise_id: string;
-            exercise_name: string;
-            kind: components["schemas"]["RecordKind"];
-            value: number;
-            unit: components["schemas"]["Unit"];
-            /** @description Absent for a first record. */
-            previous?: number;
-            /** Format: uuid */
-            set_id: string;
-            /** @description No set qualifies any more; value is 0. */
-            removed?: boolean;
-        };
-        /** @enum {unknown} */
-        RecordKind: "heaviest_load" | "best_e1rm" | "best_set_volume";
         /** @description An exercise to confirm with the user, then fix with PATCH /v1/entries/{entry_id}. */
         Confirmation: {
             /** Format: uuid */
@@ -390,8 +353,6 @@ export interface components {
             undo_token: string;
             /** Format: date-time */
             undo_expires_at: string;
-            records_changed: components["schemas"]["Record"][];
-            summary: string;
         };
         /** @description The log as the Open Workout core promises it, an OWS v0 log document (https://openworkout.dev/schema/v0/log.json). A server may add more of the person's record beside its keys. */
         OWSExport: components["schemas"]["log"];
@@ -399,11 +360,12 @@ export interface components {
             id: string;
             version?: number;
             day?: string;
-        };
-        Warning: {
-            /** @enum {unknown} */
-            code: "llm_unavailable" | "llm_rejected" | "skipped_segment" | "could_not_parse" | "value_dropped" | "date_unread" | "relative_reference" | "llm_limited";
-            detail?: string;
+            /** @description An OWS workout's program label. Ignored. */
+            listed?: boolean;
+            /** @description An OWS workout's program label. Ignored. */
+            name?: string;
+            /** @description An OWS workout's program label. Ignored. */
+            day_name?: string;
         };
         ExerciseMatch: {
             id: string;
@@ -414,10 +376,18 @@ export interface components {
             is_custom: boolean;
             score: number;
         };
+        /** @description A set as a client describes it, or as an OWS workout document has it. */
         SetInput: {
+            /** @description A stored set's ID, as an OWS document carries it. Ignored. */
+            id?: string;
+            /**
+             * @description The OWS set type; working when left out. Only warm-ups are left out of records.
+             * @enum {unknown}
+             */
+            type?: "working" | "warmup" | "backoff" | "amrap" | "failure" | "drop";
             reps?: number;
-            /** @description Leave out for bodyweight. */
-            load?: number;
+            /** @description Leave out for bodyweight. A number with unit beside it, or an OWS load {value, unit}. */
+            load?: number | components["schemas"]["load"];
             /** @description Leave out for the user's unit. */
             unit?: components["schemas"]["Unit"];
             rpe?: number;
@@ -427,28 +397,61 @@ export interface components {
             calories?: number;
             /** @description Average heart rate over the set, only as a watch or app reported it. */
             heart_rate_bpm?: number;
-            /** @description Warm-ups don't count toward records. */
+            /** @description The same as type warmup. Warm-ups don't count toward records. */
             warmup?: boolean;
-            /** @description The values were inferred (e.g. read from a photo), not stated. */
+            /** @description The values were inferred, not stated: read off a machine's screen, say. */
             estimated?: boolean;
         };
+        /** @description One exercise and its sets: name and exercise_id, or an OWS entry's exercise and text. */
         ExerciseInput: {
+            /** @description A stored entry's ID, as an OWS document carries it. Ignored. */
+            id?: string;
             /** @description The exercise as the user named it. */
             name?: string;
             /** @description A catalogue or custom ID, when known; skips matching. */
             exercise_id?: string;
+            /** @description An OWS entry's exercise. Its id is exercise_id; its name is used when neither name nor text is given; match is the server's and ignored. */
+            exercise?: {
+                id?: string | null;
+                name?: string;
+                match?: string;
+            };
+            /** @description An OWS entry's text: what the person called the exercise. Used as name when name isn't given. */
+            text?: string;
             sets: components["schemas"]["SetInput"][];
             notes?: string;
         };
+        /** @description A workout to log. An OWS workout document can be posted as it is: the members the server assigns (id, updated_at, merged_sources, source's kind and client, entries' and sets' id, an exercise's match, a program label's name, day_name and listed) are ignored. */
         WorkoutInput: {
+            /** @constant */
+            $schema?: "https://openworkout.dev/schema/v0/workout.json";
+            /** @description A stored workout's ID, as an OWS document carries it. Ignored. */
+            id?: string;
+            /**
+             * Format: date-time
+             * @description Ignored: the server's clock sets it.
+             */
+            updated_at?: string;
+            /** @description Ignored: merges are the server's. */
+            merged_sources?: Record<string, never>[];
             /** Format: date-time */
             started_at?: string;
-            /** @description Day in the user's timezone, when started_at is not given. Default today. */
+            /** @description Day in the workout's timezone, when started_at is not given. Default today. The start is then worked out and listed in estimates as /started_at. */
             date?: components["schemas"]["Date"];
+            /** @description The IANA time zone the workout happened in (America/Chicago), which decides its local day. Default the person's. */
+            timezone?: string;
             title?: string;
             notes?: string;
             exercises: components["schemas"]["ExerciseInput"][];
             program?: components["schemas"]["ProgramRef"];
+            /** @description An OWS document's source. Its external_id is read as external_id; kind and client come from your credential. */
+            source?: {
+                kind?: string;
+                client?: string;
+                external_id?: string | null;
+            };
+            /** @description JSON pointers (RFC 6901) into this body to values you inferred rather than were told: a set, or a value in one (the set is marked), a set's /load/unit (the unit was assumed), or /started_at. */
+            estimates?: string[];
             /** @description Your app's own ID for this workout. A second POST with the same ID replays the first (200, `Idempotent-Replayed: true`) instead of logging twice; one the person has since deleted here answers 404 and stays deleted. Not for the web app. */
             external_id?: string;
         };
@@ -748,7 +751,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description `nothing_to_log`, `parse_unsure`, `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`. */
+        /** @description `exercise_ambiguous` (with `candidates`) or `idempotency_conflict`. */
         Unprocessable: {
             headers: {
                 [name: string]: unknown;

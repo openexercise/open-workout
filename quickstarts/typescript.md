@@ -51,7 +51,7 @@ const api = createOpenWorkoutClient({ baseUrl: apiBase, token: () => tokens.acce
 const logged = unwrap(await api.POST('/v1/workouts', {
   body: { external_id: 'my-42', exercises: [{ name: 'back squat', sets: [{ reps: 5, load: 100, unit: 'kg' }] }] },
 }))
-console.log(logged.summary) // tell the person this
+console.log(`Logged ${logged.workout.id}`)
 for (const c of logged.needs_confirmation) {
   // Ask the person which exercise they meant (c.candidates); never guess. Then PATCH /v1/entries/{id}.
 }
@@ -80,7 +80,7 @@ A delivery only says which workout changed; read it (or sync the change feed) to
 ## Keep to
 
 - Log only what the person said, and mark anything you inferred `estimated`.
-- Show the person the `summary`, and any `warnings`.
+- Confirm anything in `needs_confirmation` with the person before you treat it as settled.
 - Wait out `Retry-After` on `rate_limited`.
 
 `partner-app`'s tests run all of this against the template server in CI (`npm test`, with Go

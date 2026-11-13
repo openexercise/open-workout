@@ -1,11 +1,15 @@
-// Generates the client's types from two OpenAPI documents:
+// Generates the client's types from three OpenAPI documents:
 //
 // - src/core.d.ts from the Open Workout API core (core.yaml), what any Open Workout server serves;
-// - src/lifterclub-api.d.ts from Lifterclub's full API (v1.yaml), the core plus its extensions.
+// - src/ofl-core.d.ts from the Open Food Log API core (ofl-core.yaml), what any Open Food Log
+//   server serves;
+// - src/lifterclub-api.d.ts from Lifterclub's full API (v1.yaml), both cores plus its extensions.
 //
-// Both live in the Lifterclub repository (docs/openapi/ows-core.yaml and v1.yaml), the source of
-// truth until OWS v1, and are published next to this package in openexercise/open-workout as
-// api/core.yaml and api/v1.yaml. CORE_SPEC and SPEC name other copies.
+// All live in the Lifterclub repository (docs/openapi/ows-core.yaml, ofl-core.yaml and v1.yaml),
+// the source of truth until v1, and are published next to this package in
+// openexercise/open-workout as api/core.yaml, api/ofl-core.yaml and api/v1.yaml (the Open Food Log
+// core also as api/core.yaml in openexercise/open-food-log). CORE_SPEC, OFL_CORE_SPEC and SPEC
+// name other copies.
 //
 // The Workout schema is the Open Workout Schema document, whose sub-schemas live under $defs.
 // openapi-typescript lifts those into components (source, entry, set…) but also emits $defs as
@@ -46,4 +50,5 @@ async function generate(spec, file, what) {
 }
 
 await generate(find('CORE_SPEC', 'ows-core.yaml', 'core.yaml'), 'core.d.ts', 'the Open Workout API core')
+await generate(find('OFL_CORE_SPEC', 'ofl-core.yaml', 'ofl-core.yaml'), 'ofl-core.d.ts', 'the Open Food Log API core')
 await generate(find('SPEC', 'v1.yaml', 'v1.yaml'), 'lifterclub-api.d.ts', "Lifterclub's API document")
