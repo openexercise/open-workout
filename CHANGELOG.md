@@ -20,6 +20,11 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Contributor and developer guides:** `CONTRIBUTING.md` now covers setup, which paths are
+  published from Lifterclub until v1, how a schema change is proposed here and lands there, adding
+  conformance checks, the checks to run and releases; `docs/developer-guide.md` walks through the
+  documents member by member, the API core, webhooks, the MCP profile, conformance and the clients.
+  `examples/lower-day.json` shows a local day, set types, an unmatched entry, cardio and an estimate.
 - **Schema 0.1:** versions, extension members and a prose specification (`schema/v0/SPEC.md`).
   Workouts, routines, programs and logs gain `ows_version`; workouts, entries, sets, routines, rows,
   programs, days and slots allow `x-<vendor>-…` members. The Go client's `Workout` reads
