@@ -166,9 +166,8 @@ check passes there before Lifterclub moves to the new version.
 
 - **Conformant servers:** add a row to the table in `README.md` under "Conformant servers", with
   what passes and the version of `ows` it passed. It's self-reported.
-- **Extension vendors:** SPEC.md section 8 says `x-<vendor>-…` names are registered in the README.
-  That list doesn't exist yet; the first registration adds it. Give the vendor name, who you are,
-  and a link.
+- **Extension vendors:** add a row to the table in `README.md` under "Extension vendors" (SPEC.md
+  section 8): the prefix, who you are, and a contact.
 
 ## Before you open a pull request
 

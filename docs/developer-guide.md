@@ -252,9 +252,8 @@ that reads a write may drop them.
 }
 ```
 
-`<vendor>` is your producer name. SPEC.md section 8 says vendor names are registered in this
-repository's README by pull request; that list doesn't exist yet, so the first registration adds
-it. An extension that proves useful to more than one producer can be proposed for the core
+`<vendor>` is your producer name, registered in the README's
+[Extension vendors](../README.md#extension-vendors) table by pull request (SPEC.md section 8). An extension that proves useful to more than one producer can be proposed for the core
 ([CONTRIBUTING.md](../CONTRIBUTING.md)).
 
 Don't use an extension to carry a value the schema already has a member for, and don't use one to
