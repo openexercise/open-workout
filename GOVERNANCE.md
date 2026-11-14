@@ -12,14 +12,14 @@ Write to the maintainers at maintainers@openexercise.org, or open an issue. Some
 
 ## How decisions are made
 
-- **Changes** start as an issue or proposal here ([CONTRIBUTING.md](CONTRIBUTING.md)), and a maintainer decides after at least a week for comment. Each lands with a changelog entry in `schema/CHANGELOG.md`.
+- **Changes** start as an issue or proposal here ([CONTRIBUTING.md](CONTRIBUTING.md)), and a maintainer decides after at least a week for comment. Each lands with a changelog entry in `schema/CHANGELOG.md`, written in Lifterclub and published here with the change until v1.
 - **Versions:** v0 is a development draft, so breaking changes can still land. v1 freezes when the first application outside Lifterclub writes OWS in production; after it, changes are additive, and a breaking one needs a new major version through a written proposal (an RFC process set up at that point).
 
 Maintainers aim for agreement in the issue. When there isn't any, the lead maintainer decides and says why in the issue.
 
 ## Where the source of truth is
 
-Until v1, the schema, the tool profile, the API document and the clients are published here from [Lifterclub](https://github.com/mightydotrun/lifterclub), the reference implementation, where they are tested against real output. An agreed change is made there and published here. At v1 the source of truth moves to this repository.
+Until v1, the schema, the tool profile, the API document and the clients are published here from Lifterclub (lifterclub.com), the reference implementation, where they are tested against real output. Lifterclub's repository is private, so the published copies here, and their pull requests, are what you review. An agreed change is made there and published here. At v1 the source of truth moves to this repository.
 
 ## Conduct and security
 

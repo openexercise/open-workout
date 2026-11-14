@@ -20,6 +20,9 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Extension vendors are registered:** the README gains the "Extension vendors" table SPEC.md
+  section 8 points to, with `x-lifterclub-`; GOVERNANCE.md no longer links Lifterclub's private
+  repository and says where `schema/CHANGELOG.md` is written.
 - **The developer guide on the site:** openworkout.dev serves `docs/developer-guide.md` at
   `/guide/`, linked from the navigation, the home page and the quickstarts. Every Markdown page's
   relative links now go to the site's own page or file where there is one (the spec, quickstarts,

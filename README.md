@@ -157,6 +157,14 @@ The package and its version come from Lifterclub, which publishes them here. To 
 2. Tag the merge here and push the tag: `git tag clients-ts-v0.4.0 && git push origin clients-ts-v0.4.0`.
 3. The Publish TypeScript client workflow checks the tag against `package.json`, tests, and publishes with provenance, through npm's trusted publishing: no token is stored in this repository.
 
+## Extension vendors
+
+Producers add members named `x-<vendor>-…` (SPEC.md section 8). To register a vendor name, open a pull request adding a row here; an extension more than one producer needs is a candidate for the core.
+
+| Prefix | Who | Contact |
+| --- | --- | --- |
+| `x-lifterclub-` | Lifterclub, the reference implementation | `lifterclub.com` |
+
 ## Relationship to other standards
 
 An OWS entry refers to its exercise by an [Open Exercise](https://github.com/openexercise/open-exercise) ID (`oec:barbell-bench-press`). Open Exercise says what an exercise is; Open Workout records what someone did.
