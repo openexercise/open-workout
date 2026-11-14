@@ -46,7 +46,7 @@ The site at [openworkout.dev](https://openworkout.dev) is built from this reposi
 
 The [quickstarts](quickstarts/README.md) get an app, an assistant or a server going in a few minutes, against the [template server](mcp/template) on your machine or Lifterclub's sandbox. The API core is rendered at [openworkout.dev/api](https://openworkout.dev/api/).
 
-The [developer guide](docs/developer-guide.md) is the longer read: the workout, routine, log and program documents member by member, exercise IDs and matches, estimates, versions and extensions, the API core, webhooks, the MCP profile, and checking your own server.
+The [developer guide](docs/developer-guide.md) is the longer read: the workout, routine, log and program documents member by member, exercise IDs and matches, estimates, versions and extensions, the API core, webhooks, the MCP profile, and checking your own server. It's also on the site at [openworkout.dev/guide](https://openworkout.dev/guide/).
 
 ## Check a server
 

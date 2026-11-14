@@ -9,6 +9,9 @@ Four ways in, each runnable in a few minutes:
 | [An assistant over MCP](mcp.md) | Connect Claude (or any MCP client) to a log, or check your own MCP server |
 | [Matching exercise names](matching.md) | An app maps names to Open Exercise IDs with a token of its own, no person involved |
 
+The [developer guide](../docs/developer-guide.md) is the longer read behind them: every document
+member by member, the API core, webhooks, the MCP profile and checking your own server.
+
 ## Where to run them
 
 - **Locally, against the template server.** `mcp/template` is a small Open Workout server with the

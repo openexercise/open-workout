@@ -20,6 +20,12 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **The developer guide on the site:** openworkout.dev serves `docs/developer-guide.md` at
+  `/guide/`, linked from the navigation, the home page and the quickstarts. Every Markdown page's
+  relative links now go to the site's own page or file where there is one (the spec, quickstarts,
+  changelog, MCP profile, schemas, examples), else to GitHub, and headings carry GitHub's IDs, so
+  `#anchors` work in both places (the quickstarts' `#where-to-run-them` didn't before). A test
+  builds the site and fails on any link that leads nowhere.
 - **TypeScript client 0.6.0** (`clients-ts-v0.6.0`): the OFL core's recipes, saved meals and copying
   a meal, `barcode_unavailable`, and the export's own exercises and phrases in the Lifterclub types.
   Additive since 0.5.0.
