@@ -1,6 +1,6 @@
 {
   "name": "@openexercise/open-workout-client",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "A thin TypeScript client for any Open Workout or Open Food Log server, generated from their API cores, with Lifterclub's full API as a subpath.",
   "license": "Apache-2.0",
   "repository": {
