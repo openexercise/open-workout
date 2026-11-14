@@ -20,6 +20,9 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **TypeScript client 0.6.0** (`clients-ts-v0.6.0`): the OFL core's recipes, saved meals and copying
+  a meal, `barcode_unavailable`, and the export's own exercises and phrases in the Lifterclub types.
+  Additive since 0.5.0.
 - **`ows validate` knows every document and needs no checkout:** it validates logs and routines as
   well as workouts and programs, and uses the schemas built into the command, so an installed
   `ows` works anywhere. `examples/` gains a routine and a log.
