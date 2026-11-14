@@ -21,6 +21,7 @@
 {{range .Schemas}}<li><a href="/schema/v0/{{.Kind}}.json">{{.Kind}}.json</a>, JSON Schema (draft 2020-12), at its <code>$id</code></li>
 {{end}}<li><a href="/mcp/tools.json">The MCP tool profile</a>: {{len .Profile.Tools}} tools, generated from the reference server</li>
 <li><a href="/examples/push-day.json">An example workout</a> and <a href="/examples/two-day-linear.json">an example program</a></li>
+<li><a href="/quickstarts/">The quickstarts</a> for something running in minutes, and <a href="/guide/">the developer guide</a>: every document member by member, the API core, webhooks, the MCP profile and checking your own server</li>
 <li><code>go run github.com/openexercise/open-workout/cmd/ows@latest validate my-workout.json</code></li>
 </ul>
 </section>

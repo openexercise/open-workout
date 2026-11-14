@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 )
 
 //go:embed templates/*.html templates/style.css
@@ -129,44 +133,17 @@ func buildSite(root, out string) error {
 	if err := render("api", "api.html", page{Title: "API core", Description: "The routes every Open Workout server serves: workouts, sets and entries, undo, the change feed, export, webhooks and exercise search.", API: api}); err != nil {
 		return err
 	}
-	// The quickstarts, with links between them made site paths.
-	quickstarts := map[string]string{"": "Quickstarts", "typescript": "TypeScript quickstart", "go": "Go quickstart", "mcp": "MCP quickstart", "matching": "Matching quickstart"}
-	for name, title := range quickstarts {
-		file := name + ".md"
-		if name == "" {
-			file = "README.md"
-		}
-		html, err := renderMarkdown(filepath.Join(root, "quickstarts", file))
-		if err != nil {
-			return err
-		}
-		html = template.HTML(quickstartLinks.ReplaceAllStringFunc(string(html), func(href string) string {
-			target := quickstartLinks.FindStringSubmatch(href)
-			if target[1] == "README" {
-				return `href="/quickstarts/` + target[2] + `"`
-			}
-			return `href="/quickstarts/` + target[1] + `/` + target[2] + `"`
-		}))
-		html = template.HTML(repoLinks.ReplaceAllString(string(html), `href="https://github.com/openexercise/open-workout/tree/main/$1"`))
-		if err := render(filepath.Join("quickstarts", name), "doc.html", page{Title: title, Description: title + " for Open Workout.", HTML: html}); err != nil {
-			return err
-		}
-	}
 	if err := render("mcp", "mcp.html", page{Title: "MCP tool profile", Description: "The tools an assistant uses over an Open Workout log, as the reference server lists them.", Profile: &prof}); err != nil {
 		return err
 	}
-	titles := map[string]string{"changelog": "Changelog", "mcp/profile": "What a compatible server keeps to", "schema/v0/spec": "Open Workout Schema v0 specification"}
-	for name, path := range map[string]string{"changelog": filepath.Join(root, "schema", "CHANGELOG.md"), "mcp/profile": filepath.Join(root, "mcp", "README.md"), "schema/v0/spec": filepath.Join(root, "schema", "v0", "SPEC.md")} {
-		html, err := renderMarkdown(path)
+	// The Markdown pages, each with its relative links moved to where the site serves the target
+	// (sitePaths) or else to the file on GitHub.
+	for _, d := range markdownPages {
+		html, err := renderMarkdown(root, d.Source)
 		if err != nil {
 			return err
 		}
-		if name == "schema/v0/spec" {
-			// SPEC.md links its neighbours relatively, as GitHub shows it; on the site they live elsewhere.
-			html = template.HTML(specLinks.Replace(string(html)))
-		}
-		title := titles[name]
-		if err := render(name, "doc.html", page{Title: title, Description: title + ".", HTML: html}); err != nil {
+		if err := render(d.Path, "doc.html", page{Title: d.Title, Description: d.Description, HTML: html}); err != nil {
 			return err
 		}
 	}
@@ -324,35 +301,126 @@ func str(v any) string {
 	return s
 }
 
-var (
-	// quickstartLinks are links from one quickstart to another (go.md, README.md#where-to-run-them).
-	quickstartLinks = regexp.MustCompile(`href="(README|typescript|go|mcp|matching)\.md(#[^"]*)?"`)
-	// repoLinks leave the quickstarts for the repository (../partner-app, ../mcp/README.md).
-	repoLinks = regexp.MustCompile(`href="\.\./([^"]*)"`)
-)
+// markdownPage is a Markdown file in the repository rendered as a page of the site.
+type markdownPage struct {
+	Source, Path, Title, Description string
+}
 
-// specLinks moves SPEC.md's relative links to where the site serves those files.
-var specLinks = strings.NewReplacer(
-	`href="workout.json"`, `href="/schema/v0/workout.json"`,
-	`href="routine.json"`, `href="/schema/v0/routine.json"`,
-	`href="program.json"`, `href="/schema/v0/program.json"`,
-	`href="log.json"`, `href="/schema/v0/log.json"`,
-	`href="progression-vectors.json"`, `href="/schema/v0/progression-vectors.json"`,
-	`href="webhook-signature-vectors.json"`, `href="/schema/v0/webhook-signature-vectors.json"`,
-	`href="../CHANGELOG.md"`, `href="/changelog/"`,
-)
+var markdownPages = []markdownPage{
+	{"quickstarts/README.md", "quickstarts", "Quickstarts", "Quickstarts for Open Workout."},
+	{"quickstarts/typescript.md", "quickstarts/typescript", "TypeScript quickstart", "TypeScript quickstart for Open Workout."},
+	{"quickstarts/go.md", "quickstarts/go", "Go quickstart", "Go quickstart for Open Workout."},
+	{"quickstarts/mcp.md", "quickstarts/mcp", "MCP quickstart", "MCP quickstart for Open Workout."},
+	{"quickstarts/matching.md", "quickstarts/matching", "Matching quickstart", "Matching quickstart for Open Workout."},
+	{"docs/developer-guide.md", "guide", "Developer guide", "How to write and read Open Workout data, and how to build a server that serves it."},
+	{"schema/CHANGELOG.md", "changelog", "Changelog", "Changelog."},
+	{"mcp/README.md", "mcp/profile", "What a compatible server keeps to", "What a compatible server keeps to."},
+	{"schema/v0/SPEC.md", "schema/v0/spec", "Open Workout Schema v0 specification", "Open Workout Schema v0 specification."},
+}
 
-func renderMarkdown(path string) (template.HTML, error) {
-	src, err := os.ReadFile(path)
+// sitePaths maps repository paths to where the site serves them, as a rendered page or the file
+// itself. A relative link to anything else goes to GitHub.
+var sitePaths = func() map[string]string {
+	m := map[string]string{
+		"schema/v0":      "/schema/",
+		"api/core.yaml":  "/api/core.yaml",
+		"mcp/tools.json": "/mcp/tools.json",
+	}
+	for _, d := range markdownPages {
+		m[d.Source] = "/" + strings.TrimSuffix(d.Path, "/") + "/"
+	}
+	for _, f := range []string{"workout", "program", "routine", "log", "progression-vectors", "webhook-signature-vectors"} {
+		m["schema/v0/"+f+".json"] = "/schema/v0/" + f + ".json"
+	}
+	return m
+}()
+
+// hrefs finds every link target in rendered HTML.
+var hrefs = regexp.MustCompile(`href="([^"]*)"`)
+
+const repoURL = "https://github.com/openexercise/open-workout"
+
+// renderMarkdown renders a repository file (path relative to root) and rewrites its relative links.
+func renderMarkdown(root, rel string) (template.HTML, error) {
+	src, err := os.ReadFile(filepath.Join(root, rel))
 	if err != nil {
 		return "", err
 	}
+	md := goldmark.New(goldmark.WithExtensions(extension.Table), goldmark.WithParserOptions(parser.WithAutoHeadingID()))
 	var b bytes.Buffer
-	if err := goldmark.New(goldmark.WithExtensions(extension.Table)).Convert(src, &b); err != nil {
-		return "", fmt.Errorf("render %s: %w", path, err)
+	ctx := parser.NewContext(parser.WithIDs(&githubIDs{seen: map[string]bool{}}))
+	if err := md.Convert(src, &b, parser.WithContext(ctx)); err != nil {
+		return "", fmt.Errorf("render %s: %w", rel, err)
 	}
-	return template.HTML(b.String()), nil // our own file in this repository
+	var linkErr error
+	out := hrefs.ReplaceAllStringFunc(b.String(), func(m string) string {
+		target, err := siteLink(root, rel, hrefs.FindStringSubmatch(m)[1])
+		if err != nil && linkErr == nil {
+			linkErr = fmt.Errorf("%s: %w", rel, err)
+		}
+		return `href="` + target + `"`
+	})
+	if linkErr != nil {
+		return "", linkErr
+	}
+	return template.HTML(out), nil // our own file in this repository
 }
+
+// siteLink moves a link written relative to a file in the repository (as GitHub shows it) to the
+// page or file the site serves, or else to the repository on GitHub. A target missing from the
+// repository is an error.
+func siteLink(root, from, href string) (string, error) {
+	if href == "" || strings.HasPrefix(href, "#") || strings.HasPrefix(href, "/") || strings.Contains(href, ":") {
+		return href, nil // in-page, already a site path, or another site (https:, mailto:)
+	}
+	target, fragment, _ := strings.Cut(href, "#")
+	if fragment != "" {
+		fragment = "#" + fragment
+	}
+	p := path.Clean(path.Join(path.Dir(from), target))
+	if p == "." || strings.HasPrefix(p, "../") {
+		return "", fmt.Errorf("link %q leaves the repository", href)
+	}
+	if site, ok := sitePaths[p]; ok {
+		return site + fragment, nil
+	}
+	if path.Dir(p) == "examples" && path.Ext(p) == ".json" {
+		return "/" + p + fragment, nil // every example is copied to the site
+	}
+	info, err := os.Stat(filepath.Join(root, filepath.FromSlash(p)))
+	if err != nil {
+		return "", fmt.Errorf("link %q: %w", href, err)
+	}
+	kind := "blob"
+	if info.IsDir() {
+		kind = "tree"
+	}
+	return repoURL + "/" + kind + "/main/" + p + fragment, nil
+}
+
+// githubIDs gives headings the IDs GitHub gives them, so a document's #anchors work in both
+// places: lower case, punctuation other than - and _ dropped, spaces as -, repeats numbered.
+type githubIDs struct{ seen map[string]bool }
+
+func (g *githubIDs) Generate(value []byte, _ ast.NodeKind) []byte {
+	var b strings.Builder
+	for _, r := range strings.ToLower(string(value)) {
+		switch {
+		case r == ' ':
+			b.WriteRune('-')
+		case r == '-' || r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r):
+			b.WriteRune(r)
+		}
+	}
+	id := b.String()
+	for i := 1; g.seen[id]; i++ {
+		id = fmt.Sprintf("%s-%d", b.String(), i)
+	}
+	g.seen[id] = true
+	return []byte(id)
+}
+
+func (g *githubIDs) Put(value []byte) { g.seen[string(value)] = true }
 
 func writeFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
