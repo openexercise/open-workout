@@ -965,6 +965,17 @@ paths:
                   routines:
                     type: array
                     items: { $ref: "#/components/schemas/Routine" }
+                  last_done:
+                    type: array
+                    x-ows-core: false
+                    description: "When each routine was last started, for the ones that have been: its latest workout still in the log that was started from it."
+                    items:
+                      type: object
+                      required: [routine_id, workout_id, started_at]
+                      properties:
+                        routine_id: { type: string, format: uuid }
+                        workout_id: { type: string, format: uuid }
+                        started_at: { type: string, format: date-time }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
@@ -1255,6 +1266,21 @@ paths:
         or more than 100 g of protein, fat and carbohydrate, in 100 g is refused as numbers per
         serving typed as per 100 g. It's visible only to this user. If the user already has a food
         by that name, it's returned unchanged (200). A server may limit how many (Lifterclub: 1,000).
+
+        A packaged product the user enters (v0.3) may also carry its `gtin` (one barcode, 8 to 14
+        digits with a valid check digit, stored as 14), its `brand` and its `label` as printed. The
+        label's `nutrients_per_serving` are then the food's values, as the specification's section 5
+        says: with a serving weight they're worked out per 100 g and the serving becomes the default
+        portion; with only a volume they're per 100 ml (`nutrients_basis: "100ml"`); with neither, the
+        food is counted by servings (`nutrients_basis: "serving"`), never by an invented weight. A
+        label with a part over its whole (saturated fat over fat, sugars over carbohydrate) is
+        refused (`invalid_input` on `label.nutrients_per_serving`). `nutrients_per_100ml` gives a
+        drink's values directly. Give the values one way only. Reading that barcode as a `gtin:` ID
+        (`GET /v1/foods/gtin:…`) then finds this food first, for this user only.
+
+        With a `gtin`: if the user already has a food with that barcode, that food comes back
+        (200), whatever its name. If they have a food by this name without it, the request is
+        refused (`invalid_input` on `name`).
       summary: Make one of the user's own foods
       description: |
         For a food the catalogue lacks, typed from its label. Give `nutrients_per_100g`, or a
@@ -1264,6 +1290,23 @@ paths:
         serving typed as per 100 g. It's visible only to this user. If the user already has a food
         by that name, it's returned unchanged (200). No health-data consent is needed: a food isn't
         a record of what anyone ate. At most 1,000 per user.
+
+        A packaged product the person enters (docs/label-capture.md) may also carry its `gtin`
+        (one barcode, 8 to 14 digits with a valid check digit, stored as 14), its `brand` and its
+        `label` as printed. The label's `nutrients_per_serving` are then the food's values: with a
+        serving weight they're worked out per 100 g and the serving becomes the default portion;
+        with only a volume (a drink labelled "1 can (330 ml)") they're per 100 ml
+        (`nutrients_basis: "100ml"`); with neither, the food is counted by servings
+        (`nutrients_basis: "serving"`), never by an invented weight. `nutrients_per_100ml` gives a
+        drink's values directly. Give the values one way only. A label with a part over its whole
+        (saturated fat over fat, sugars over carbohydrate) is refused (`invalid_input` on
+        `label.nutrients_per_serving`). Scanning or looking up that barcode (`GET /v1/foods/gtin:…`)
+        then finds this food first.
+
+        With a `gtin`: if the user already has a food with that barcode, that food comes back
+        (200), whatever its name. If they have a food by this name without it, the request is
+        refused (`invalid_input` on `name`): add the barcode to that food with `PATCH
+        /v1/foods/{id}`, or give this one another name.
       tags: [Foods]
       security: [{ oauth2: [meals:write] }]
       requestBody:
@@ -1288,6 +1331,70 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/foods/label:
+    post:
+      operationId: readFoodLabel
+      summary: Read a photo of a food label into a draft of one of the user's own foods, without saving it
+      description: |
+        For a packaged food no database has (docs/label-capture.md): a photo of its nutrition panel,
+        sent as `multipart/form-data` with an `image` (JPEG, PNG, HEIC, HEIF or WebP, told by its
+        content, up to 8 MB; downscale first), the scanned `gtin` when there is one (the barcode is
+        never read from the photo) and optional `text` ("the 12-pack"). The answer's `food` is the
+        body for POST /v1/foods once the person has checked every number; nothing is saved.
+
+        An optional `front`, a photo of the front of the same package, gives the product's name and
+        brand. Both photos go to the model in one call, so the read counts once against the daily
+        limit, and together they're at most 8 MB. The name and brand, from either photo, must be
+        words the model copied off the pack (a name it can't find there is left out with
+        `value_dropped`), and are listed in `generated` like every value the model read.
+
+        Nothing in the draft is estimated. The model copies the panel's lines first, and every
+        number must appear there with its unit; the label's own arithmetic (parts within their
+        whole, energy against protein, fat and carbohydrate, kJ against kcal, salt against sodium,
+        per serving against per 100 g) and, on US and Canadian labels, each amount against its %DV
+        must hold. A value that fails is left out and named in `warnings` (`value_dropped`,
+        `label_inconsistent`), for the person to read off the package. A label with no serving
+        weight asks for it (`serving_weight_unknown`) rather than guessing one. `food_invalid`
+        names what POST /v1/foods would still refuse.
+
+        No health-data consent is needed: a label shows a package, not what anyone ate. Label
+        photos have their own daily limit (20) and no grammar to fall back on: when the model can't
+        read one, the answer is `photo_unread`, so the person types the numbers instead. The photos
+        are read in memory and dropped: never stored. Lifterclub's own: it needs a model, so it isn't
+        part of the Open Food Log core.
+      tags: [Foods]
+      security: [{ oauth2: [meals:write] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: { $ref: "#/components/schemas/FoodLabelReadRequest" }
+            encoding:
+              image: { contentType: "image/jpeg, image/png, image/heic, image/heif, image/webp" }
+              front: { contentType: "image/jpeg, image/png, image/heic, image/heif, image/webp" }
+      responses:
+        "200":
+          description: The draft.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FoodDraft" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422":
+          description: "`photo_unread`: the model couldn't read the label, or label photos are turned off here. Enter the numbers instead."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503":
+          description: "`photo_unread`: labels can't be read just now. Enter the numbers, or try again after `Retry-After` seconds."
+          headers:
+            Retry-After: { schema: { type: integer } }
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /v1/meals:
     get:
@@ -2096,6 +2203,31 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/foods/own:
+    get:
+      operationId: listOwnFoods
+      summary: The user's own foods
+      description: |
+        Every one of the user's own `usr:` foods they haven't deleted, by name, with their
+        barcodes, brand and label: for a screen that edits or deletes them. Recipes are listed by
+        `GET /v1/recipes`. Deleted foods still read one by one, and are in the export.
+      tags: [Foods]
+      security: [{ oauth2: [meals:read] }]
+      responses:
+        "200":
+          description: The foods.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [foods]
+                properties:
+                  foods:
+                    type: array
+                    items: { $ref: "#/components/schemas/Food" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /v1/foods/{id}:
     parameters:
       - name: id
@@ -2108,9 +2240,12 @@ paths:
       x-ofl: core
       x-ofl-core-description: |
         A catalogue food with its portions, aliases and sources, or one of the user's own. A retired
-        catalogue food is still returned, since meals may name it. (Lifterclub also answers a
-        packaged product's barcode as a `gtin:` ID, looked up live at Open Food Facts, and 503 when
-        it can't be reached.)
+        catalogue food is still returned, since meals may name it. A `gtin:` ID is answered first by
+        the user's own food carrying that barcode, under its own ID (v0.3): log it by that ID. One of
+        the user's own foods they deleted still reads, with `status: "deprecated"`, since meals may
+        name it. (Lifterclub also answers a
+        packaged product's barcode as a `gtin:` ID, from USDA FoodData Central's branded foods or
+        else looked up live at Open Food Facts, and 503 when that is needed and can't be reached.)
       summary: One food
       description: |
         A catalogue food with its portions, aliases and sources, or one of the user's own. A retired
@@ -2118,18 +2253,25 @@ paths:
         aliases listed in `provenance.generated` were suggested by a model, and no record has been
         reviewed by a person yet (`provenance.review`).
 
-        A `gtin:` ID is a packaged product, looked up live at Open Food Facts (ODbL; credit it when
-        you show its data), never copied into the catalogue: only the barcode is sent. Its `id` comes
-        back as 14 digits. A drink (labelled per 100 ml, or served in ml, since Open Food Facts often
-        marks a drink's values per 100 g) has `nutrients_basis: "100ml"`, an empty
+        A `gtin:` ID is answered first by the user's own food carrying that barcode (one they made
+        with `gtin`), which comes back under its own `usr:` ID: log it by that ID. One of the
+        user's own foods they deleted still reads, with `status: "deprecated"`, since meals may name
+        it.
+
+        Otherwise a `gtin:` ID is a packaged product. Lifterclub answers it first from the USDA FoodData
+        Central branded foods it hosts (public domain, CC0; `identifiers.fdc_id` names the record),
+        else looks it up live at Open Food Facts (ODbL; `identifiers.off_code`), never copying that
+        answer into the catalogue: only the barcode is sent. `provenance.sources` names the source:
+        credit it when you show the data. Its `id` comes back as 14 digits. A drink (labelled per
+        100 ml, or served in ml, since Open Food Facts often marks a drink's values per 100 g) has `nutrients_basis: "100ml"`, an empty
         `nutrients_per_100g` and its values in `nutrients_per_100ml`: log it by volume, in servings,
         or with no amount for one serving. Where the countries it's sold in share a label region,
         `label` keeps the region, the declared serving (`grams` or `ml`) and the per-serving values,
         and carbohydrate follows the region (`carbohydrate_g` total in the US and Canada,
         `carbohydrate_available_g` in the EU, UK and Australia). A serving the label weighs in grams
-        is also its default portion. Allergens, diet flags and the category come from Open Food
-        Facts and are `inferred`. `x-nutrients_per_100ml` and `x-serving_ml`, the names before OFL
-        v0.1, are still sent beside them until the next release. 503 when Open Food Facts can't be reached.
+        is also its default portion. Allergens, diet flags and the category are `inferred`.
+        `x-nutrients_per_100ml` and `x-serving_ml`, the names before OFL v0.1, are still sent beside
+        them until the next release. 503 when a product isn't hosted and Open Food Facts can't be reached.
       tags: [Foods]
       security: [{ oauth2: [meals:read] }]
       responses:
@@ -2148,6 +2290,56 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    patch:
+      operationId: updateFood
+      summary: Change one of the user's own foods
+      description: |
+        Changes one of the user's own `usr:` foods: name, brand, barcodes, values, label, portions
+        or density. A field left out stays. Giving any of `nutrients_per_100g`,
+        `nutrients_per_100ml`, `nutrients_per_serving` with `serving`, or `label` replaces all of
+        the food's values with what's given, so send everything the label says. `gtin` replaces
+        the food's barcodes (`[]` takes them all off); a barcode another of the user's foods has is
+        refused. `brand: ""` and `density_g_per_ml: null` clear. A name another of the user's foods
+        or recipes has is refused. Meals already logged keep what they counted. Catalogue foods,
+        packaged products and deleted foods can't be changed (`invalid_input` on `id`, or 404);
+        recipes change through `PUT /v1/recipes/{id}`.
+      tags: [Foods]
+      security: [{ oauth2: [meals:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FoodPatch" }
+      responses:
+        "200":
+          description: The food as it is now.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Food" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteFood
+      summary: Delete one of the user's own foods
+      description: |
+        Deletes one of the user's own `usr:` foods. Meals, recipes and saved meals that used it
+        still read it: `GET /v1/foods/{id}` answers it with `status: "deprecated"`, and the export
+        keeps it. Search, matching and its barcodes no longer find it, phrases taught to it are
+        forgotten, and its name is free for a new food. It can't be undone. Catalogue foods and
+        packaged products can't be deleted (`invalid_input` on `id`); recipes are deleted through
+        `DELETE /v1/recipes/{id}`.
+      tags: [Foods]
+      security: [{ oauth2: [meals:write] }]
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
   /v1/exercises/{id}:
@@ -2641,7 +2833,7 @@ components:
 
     Me:
       type: object
-      required: [id, email, display_name, unit_system, timezone, calm_mode, onboarded, health_consent]
+      required: [id, email, display_name, unit_system, timezone, calm_mode, onboarded, health_consent, language]
       properties:
         id: { type: string, format: uuid }
         email: { type: string, format: email }
@@ -2649,11 +2841,14 @@ components:
         unit_system: { enum: [metric, imperial] }
         timezone: { type: string }
         calm_mode: { type: boolean, description: "Hide records, totals and progress numbers." }
+        language: { type: [string, "null"], enum: [en, es, fr, de, null], description: "The language the web app shows, or null to follow the browser. Sentence logging, assistants and the server's own pages stay English." }
         onboarded: { type: boolean, description: The account has finished its setup form. }
         health_consent: { type: boolean, description: Health-data consent is in force; writes need it. }
         meal_consent: { type: boolean, description: "The consent in force covers meals too, so meal writes will be accepted: an older one covers workouts only." }
         photo_consent: { type: boolean, description: "The consent in force covers meal photos too, so a photo will be read: one from before 2026-11-12 covers meals typed or picked only. Ask before the camera opens." }
         meal_photos: { type: boolean, description: "This server reads meal photos. When false, a photo is refused as photo_unread: offer typing instead of a camera." }
+        label_photos: { type: boolean, description: "This server reads photos of food labels (POST /v1/foods/label). When false, offer typing the label's numbers instead." }
+        workouts: { type: boolean, description: "The apps show the workout log here. When false, Lifterclub's own apps hide workouts for a nutrition-first launch; the API still serves them." }
 
     WorkoutList:
       type: object
@@ -3062,14 +3257,14 @@ components:
     LogExport:
       x-ows-core-as: OWSExport
       x-ofl-core-as: OFLExport
-      description: What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` with `profile:read`.
+      description: What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` with `profile:read`. Each workout started from one of the person's routines names it in its OWS `routine` label.
       type: object
       required: [exported_at, consents]
       properties:
         ows_version: { type: string, description: "The OWS version of the log, with workouts:read (0.1)." }
         exported_at: { type: string, format: date-time }
         profile: { $ref: "#/components/schemas/Profile" }
-        ofl_version: { type: string, description: "With `meals:read`: the Open Food Log version the food log's keys (foods, meals, deleted_meals) are written to, 0.2. They make an OFL log too." }
+        ofl_version: { type: string, description: "With `meals:read`: the Open Food Log version the food log's keys (foods, meals, deleted_meals) are written to, 0.3. They make an OFL log too." }
         foods:
           description: The person's own foods (`usr:`), as Open Food Log foods, oldest first; with `meals:read` only.
           type: array
@@ -3470,7 +3665,7 @@ components:
       type: object
       required: [code]
       properties:
-        code: { enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited] }
+        code: { enum: [llm_unavailable, llm_rejected, skipped_segment, could_not_parse, value_dropped, date_unread, relative_reference, llm_limited, label_inconsistent, prepared_column, region_unknown, serving_weight_unknown, name_unread, food_invalid] }
         detail: { type: string }
 
     RecordList:
@@ -3574,7 +3769,7 @@ components:
 
     Profile:
       type: object
-      required: [display_name, units, timezone, goals, equipment, limitations, training_days, calm_mode, program_suggestions, program_counts, program_counts_available, health_consent, summary]
+      required: [display_name, units, timezone, goals, equipment, limitations, training_days, calm_mode, program_suggestions, program_counts, program_counts_available, health_consent, summary, language]
       properties:
         display_name: { type: string }
         units: { $ref: "#/components/schemas/Unit" }
@@ -3587,6 +3782,7 @@ components:
         program_counts_available: { type: boolean, description: "False until public counts are turned on: don't ask before then." }
         program_suggestions: { type: boolean, description: Whether suggestions that workouts look like a known program may appear. }
         calm_mode: { type: boolean, description: "The user hides records, totals and progress numbers; don't volunteer them." }
+        language: { type: [string, "null"], enum: [en, es, fr, de, null], description: "The language the web app shows, or null to follow the browser. Sentence logging, assistants and the server's own pages stay English." }
         health_consent: { type: boolean, description: Whether workouts can be logged. }
         summary: { type: string }
 
@@ -3781,7 +3977,7 @@ components:
         notes: { type: string, maxLength: 2000 }
 
     Recipe:
-      description: An Open Food Log v0.2 recipe (https://openfoodlog.org/schema/v0/recipe.json).
+      description: An Open Food Log recipe (https://openfoodlog.org/schema/v0/recipe.json).
       type: object
       required: [$schema, ofl_version, id, name, lines, servings, nutrients_per_100g, nutrients_per_serving, source, updated_at]
       properties:
@@ -3829,7 +4025,7 @@ components:
         from_meal_id: { type: string, format: uuid, description: "A logged meal to save, its items as they were logged." }
 
     SavedMeal:
-      description: An Open Food Log v0.2 saved meal (https://openfoodlog.org/schema/v0/saved-meal.json).
+      description: An Open Food Log saved meal (https://openfoodlog.org/schema/v0/saved-meal.json; v0.2).
       type: object
       required: [$schema, ofl_version, id, name, items, source, updated_at, estimates]
       properties:
@@ -3862,7 +4058,7 @@ components:
       required: [text]
       properties:
         text: { type: string, maxLength: 200, description: "What the person called it. May be left empty with a food_id." }
-        food_id: { type: string, description: "A food from GET /v1/foods (Lifterclub: or a packaged product by its barcode as gtin:, looked up at Open Food Facts)." }
+        food_id: { type: string, description: "A food from GET /v1/foods (Lifterclub: or a packaged product by its barcode as gtin:, from USDA FoodData Central's branded foods or Open Food Facts)." }
         amount: { $ref: "#/components/schemas/FoodAmount" }
         nutrients: { $ref: "#/components/schemas/FoodNutrients", description: For an item that names no food only. }
         share: { type: number, exclusiveMinimum: 0, maximum: 1, description: "For a dish shared with others, the person's part of amount (0.25 for a quarter); grams and nutrients are then their part. Not with nutrients." }
@@ -3898,6 +4094,60 @@ components:
       required: [text]
       properties:
         text: { type: string, minLength: 1, maxLength: 1000 }
+
+    FoodLabelReadRequest:
+      type: object
+      required: [image]
+      properties:
+        image: { type: string, format: binary, description: "A photo of the nutrition panel: JPEG, PNG, HEIC, HEIF or WebP, up to 8 MB." }
+        front: { type: string, format: binary, description: "Optionally, a photo of the front of the same package, for the product's name and brand. With image, up to 8 MB together." }
+        gtin: { type: string, description: "The package's barcode as scanned or typed (gtin: in front is accepted). Never read from the photo." }
+        text: { type: string, maxLength: 200, description: "The person's own words about it, if any: which product or pack." }
+
+    FoodDraft:
+      description: A label read from a photo, nothing saved.
+      type: object
+      required: [method, food, format, generated, warnings]
+      properties:
+        method: { type: string, enum: [photo] }
+        food: { $ref: "#/components/schemas/FoodDraftFood" }
+        format: { type: string, enum: [nutrition_facts, nutrition_facts_bilingual, eu_table, other], description: "The panel's format as read; it decides the label's region (us, ca, eu; none for other)." }
+        generated:
+          type: array
+          items: { type: string }
+          description: "JSON pointers into food of every value the model read (all but gtin). Once the person has checked them they're theirs: send food alone."
+        unplaced_carbohydrate:
+          type: object
+          additionalProperties: { type: number, minimum: 0 }
+          description: "Carbohydrate read from a label whose region isn't known, keyed by where it goes (label.nutrients_per_serving, nutrients_per_100g, nutrients_per_100ml) once the person picks the region: carbohydrate_g for us and ca, carbohydrate_available_g for eu, uk and au."
+        warnings:
+          type: array
+          items: { $ref: "#/components/schemas/Warning" }
+
+    FoodDraftFood:
+      description: "A FoodRequest as read: values a check dropped are absent, and the label's region is empty when the format didn't say."
+      type: object
+      properties:
+        name: { type: string }
+        brand: { type: string }
+        gtin: { type: string, description: The scanned barcode, as 14 digits. }
+        nutrients_per_100g: { $ref: "#/components/schemas/FoodNutrients" }
+        nutrients_per_100ml: { $ref: "#/components/schemas/FoodNutrients" }
+        label:
+          type: object
+          required: [region]
+          properties:
+            region: { type: string, enum: [us, eu, uk, au, ca, ""] }
+            serving:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string }
+                grams: { type: number, exclusiveMinimum: 0 }
+                ml: { type: number, exclusiveMinimum: 0 }
+            servings_per_container: { type: number, exclusiveMinimum: 0 }
+            nutrients_per_serving: { $ref: "#/components/schemas/FoodNutrients" }
+            percent_daily_values: { type: object, additionalProperties: { type: number, minimum: 0 } }
 
     MealPhotoParseRequest:
       type: object
@@ -4003,12 +4253,12 @@ components:
         notes: { type: [string, "null"] }
 
     Meal:
-      description: An Open Food Log v0.2 meal (https://openfoodlog.org/schema/v0/meal.json).
+      description: An Open Food Log meal (https://openfoodlog.org/schema/v0/meal.json).
       type: object
       required: [$schema, ofl_version, id, date, logged_at, updated_at, source, items, estimates]
       properties:
         $schema: { type: string, const: "https://openfoodlog.org/schema/v0/meal.json" }
-        ofl_version: { type: string, description: "The Open Food Log version, as MAJOR.MINOR: 0.2." }
+        ofl_version: { type: string, description: "The Open Food Log version, as MAJOR.MINOR: 0.3." }
         id: { type: string, format: uuid }
         eaten_at: { type: string, format: date-time }
         date: { type: string, format: date }
@@ -4181,7 +4431,7 @@ components:
       required: [$schema, ofl_version, targets]
       properties:
         $schema: { type: string, const: "https://openfoodlog.org/schema/v0/targets.json" }
-        ofl_version: { type: string, const: "0.2" }
+        ofl_version: { type: string, pattern: "^0\\.[0-9]+$", description: "The Open Food Log version, as MAJOR.MINOR: 0.3." }
         updated_at: { type: string, format: date-time }
         targets: { type: array, items: { $ref: "#/components/schemas/Target" } }
     TargetsInput:
@@ -4312,14 +4562,18 @@ components:
         is_default: { type: boolean, description: The amount to assume when a person names the food without one. At most one. }
 
     Food:
-      description: An Open Food Log v0.2 food (https://openfoodlog.org/schema/v0/food.json).
+      description: An Open Food Log food (https://openfoodlog.org/schema/v0/food.json).
       type: object
       required: [id, name, kind, nutrients_per_100g]
       properties:
-        ofl_version: { type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.2." }
+        ofl_version: { type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.3." }
         id: { type: string }
         name: { type: string }
-        kind: { type: string, enum: [generic, branded, custom], description: "branded: a packaged product (Lifterclub: from Open Food Facts, by its gtin: ID)." }
+        kind: { type: string, enum: [generic, branded, custom], description: "branded: a packaged product (Lifterclub: from USDA FoodData Central's branded foods or Open Food Facts, by its gtin: ID)." }
+        status:
+          type: string
+          enum: [active, deprecated, replaced]
+          description: "deprecated: one of the user's own foods they deleted, still read because meals may name it. Left out when active."
         brand: { type: string }
         gtin: { type: array, items: { type: string, pattern: "^[0-9]{14}$" } }
         aliases:
@@ -4398,7 +4652,7 @@ components:
           type: object
           properties:
             fdc_id: { type: integer, description: USDA FoodData Central's ID. }
-            off_code: { type: string, description: "The Open Food Facts product code, for a gtin: food." }
+            off_code: { type: string, description: "The Open Food Facts product code, for a gtin: food looked up there." }
         provenance:
           type: object
           required: [sources, review]
@@ -4435,25 +4689,61 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        kind: { type: string, enum: [generic, custom] }
-        nutrients_per_100g: { $ref: "#/components/schemas/FoodNutrients" }
+        kind: { type: string, enum: [generic, custom, branded], description: "branded is a packaged product named by its barcode (a gtin: ID)." }
+        brand: { type: string, description: "A branded product's brand." }
+        nutrients_per_100g: { $ref: "#/components/schemas/FoodNutrients", description: "Empty for a product whose label gives values per 100 ml: see nutrients_per_100ml." }
+        nutrients_per_100ml: { $ref: "#/components/schemas/FoodNutrients" }
         is_reviewed: { type: boolean }
-        score: { type: number, description: "1 for a whole name, 0.95 a whole alias, 0.9 a name that starts with the word, else similarity of spelling, at most 0.85." }
+        score: { type: number, description: "1 for a whole name, 0.95 a whole alias, 0.9 a name that starts with the word, else similarity of spelling, at most 0.85. A branded product, listed after other foods of its score, scores at most 0.8, or 0.85 when the query names its brand, so it never matches surely from words." }
 
     FoodRequest:
-      description: Give nutrients_per_100g, or nutrients_per_serving with serving.
+      description: Give nutrients_per_100g, nutrients_per_100ml, nutrients_per_serving with serving, or a label with its nutrients_per_serving.
       type: object
       required: [name]
       properties:
         name: { type: string, maxLength: 120 }
+        brand: { type: string, maxLength: 120 }
+        gtin: { type: string, description: "The package's barcode: 8, 12, 13 or 14 digits with a valid check digit (gtin: in front is accepted). Stored as 14 digits." }
         nutrients_per_100g: { $ref: "#/components/schemas/FoodNutrients" }
+        nutrients_per_100ml: { $ref: "#/components/schemas/FoodNutrients", description: "A drink's values per 100 ml." }
         nutrients_per_serving: { $ref: "#/components/schemas/FoodNutrients" }
         serving: { $ref: "#/components/schemas/FoodPortion" }
+        label: { $ref: "#/components/schemas/FoodLabel", description: "The package's label as printed. With nutrients_per_serving, those are the food's values." }
         density_g_per_ml: { type: number, exclusiveMinimum: 0, maximum: 3 }
         portions:
           type: array
           maxItems: 20
           items: { $ref: "#/components/schemas/FoodPortion" }
+        values_from:
+          enum: [typed, label_photo, label_and_front_photos]
+          description: "How the values were got, named in the food's provenance.sources with today's date: typed in by the person, or read from a photo of the label (and of the front of the pack) and checked by the person (Open Food Log v0.3 section 5). Left out, the food names no source."
+          x-ofl-core: false
+
+    FoodPatch:
+      description: "A change to one of the user's own foods. Fields left out stay. Any of nutrients_per_100g, nutrients_per_100ml, nutrients_per_serving with serving, or label replaces all of the food's values."
+      type: object
+      properties:
+        name: { type: string, maxLength: 120 }
+        brand: { type: string, maxLength: 120, description: "An empty string removes it." }
+        gtin:
+          type: array
+          maxItems: 10
+          description: "Every barcode the food should carry, replacing the ones it has; [] takes them all off."
+          items: { type: string }
+        nutrients_per_100g: { $ref: "#/components/schemas/FoodNutrients" }
+        nutrients_per_100ml: { $ref: "#/components/schemas/FoodNutrients" }
+        nutrients_per_serving: { $ref: "#/components/schemas/FoodNutrients" }
+        serving: { $ref: "#/components/schemas/FoodPortion" }
+        label: { $ref: "#/components/schemas/FoodLabel" }
+        density_g_per_ml: { type: [number, "null"], exclusiveMinimum: 0, maximum: 3, description: null clears it. }
+        portions:
+          type: array
+          maxItems: 20
+          items: { $ref: "#/components/schemas/FoodPortion" }
+        values_from:
+          enum: [typed]
+          description: "typed: when the values change, provenance.sources adds the person's edit (what the food was read from stays)."
+          x-ofl-core: false
 
     ExerciseRequest:
       type: object
@@ -4480,6 +4770,8 @@ components:
         distance_m: { type: number, minimum: 0 }
         calories: { type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them." }
         heart_rate_bpm: { type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it." }
+        steps: { type: integer, minimum: 0, maximum: 200000, description: "Steps taken during the set, never a day's total (OWS 0.2). Checked, not stored yet." }
+        completed_at: { type: string, format: date-time, description: "When the set was done (OWS 0.2). Checked, not stored yet; an estimates pointer to it is ignored." }
         warmup: { type: boolean, description: "The same as type warmup. Warm-ups don't count toward records." }
         estimated: { type: boolean, description: "The values were inferred, not stated: read off a machine's screen, say." }
     ExerciseInput:
@@ -4525,6 +4817,28 @@ components:
           maxItems: 50
           items: { $ref: "#/components/schemas/ExerciseInput" }
         program: { $ref: "#/components/schemas/ProgramRef" }
+        routine:
+          type: object
+          required: [id, name]
+          description: "An OWS workout's routine label (0.2): the routine it was started from. Its id is read as routine_id; its name is ignored."
+          properties:
+            id: { type: [string, "null"] }
+            name: { type: string }
+        paused_s: { type: integer, minimum: 0, maximum: 86400, description: "Seconds paused between started_at and ended_at (OWS 0.2). Checked, not stored yet." }
+        totals:
+          type: object
+          additionalProperties: false
+          description: "What a device reported for the whole session (OWS 0.2). Checked, not stored yet."
+          properties:
+            duration_s: { type: integer, minimum: 0, maximum: 86400 }
+            calories: { type: integer, minimum: 0, maximum: 20000 }
+            heart_rate_bpm: { type: integer, minimum: 0, maximum: 300 }
+            reported_by: { type: string, maxLength: 500 }
+        routine_id:
+          type: string
+          format: uuid
+          x-ows-core: false
+          description: "The person's routine this session was started from, so `GET /v1/routines` can say when it was last done. A label: a routine that isn't theirs, or is gone, is left off and the workout still saves."
         source:
           type: object
           description: "An OWS document's source. Its external_id is read as external_id; kind and client come from your credential."
@@ -4607,6 +4921,7 @@ components:
         program_counts: { type: boolean }
         program_suggestions: { type: boolean }
         calm_mode: { type: boolean, description: "Hide records, totals and progress numbers." }
+        language: { type: string, enum: [en, es, fr, de, ""], description: "The language the web app shows; an empty string goes back to following the browser." }
         goals: { type: string }
         equipment: { type: array, items: { type: string } }
         limitations: { type: string }

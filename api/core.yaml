@@ -632,6 +632,8 @@ components:
         distance_m: {type: number, minimum: 0}
         calories: {type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them."}
         heart_rate_bpm: {type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it."}
+        steps: {type: integer, minimum: 0, maximum: 200000, description: "Steps taken during the set, never a day's total (OWS 0.2). Checked, not stored yet."}
+        completed_at: {type: string, format: date-time, description: "When the set was done (OWS 0.2). Checked, not stored yet; an estimates pointer to it is ignored."}
         warmup: {type: boolean, description: "The same as type warmup. Warm-ups don't count toward records."}
         estimated: {type: boolean, description: "The values were inferred, not stated: read off a machine's screen, say."}
     ExerciseInput:
@@ -677,6 +679,23 @@ components:
           maxItems: 50
           items: {$ref: "#/components/schemas/ExerciseInput"}
         program: {$ref: "#/components/schemas/ProgramRef"}
+        routine:
+          type: object
+          required: [id, name]
+          description: "An OWS workout's routine label (0.2): the routine it was started from. Its id is read as routine_id; its name is ignored."
+          properties:
+            id: {type: [string, "null"]}
+            name: {type: string}
+        paused_s: {type: integer, minimum: 0, maximum: 86400, description: "Seconds paused between started_at and ended_at (OWS 0.2). Checked, not stored yet."}
+        totals:
+          type: object
+          additionalProperties: false
+          description: "What a device reported for the whole session (OWS 0.2). Checked, not stored yet."
+          properties:
+            duration_s: {type: integer, minimum: 0, maximum: 86400}
+            calories: {type: integer, minimum: 0, maximum: 20000}
+            heart_rate_bpm: {type: integer, minimum: 0, maximum: 300}
+            reported_by: {type: string, maxLength: 500}
         source:
           type: object
           description: "An OWS document's source. Its external_id is read as external_id; kind and client come from your credential."

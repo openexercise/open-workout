@@ -397,6 +397,13 @@ export interface components {
             calories?: number;
             /** @description Average heart rate over the set, only as a watch or app reported it. */
             heart_rate_bpm?: number;
+            /** @description Steps taken during the set, never a day's total (OWS 0.2). Checked, not stored yet. */
+            steps?: number;
+            /**
+             * Format: date-time
+             * @description When the set was done (OWS 0.2). Checked, not stored yet; an estimates pointer to it is ignored.
+             */
+            completed_at?: string;
             /** @description The same as type warmup. Warm-ups don't count toward records. */
             warmup?: boolean;
             /** @description The values were inferred, not stated: read off a machine's screen, say. */
@@ -446,6 +453,20 @@ export interface components {
             notes?: string;
             exercises: components["schemas"]["ExerciseInput"][];
             program?: components["schemas"]["ProgramRef"];
+            /** @description An OWS workout's routine label (0.2): the routine it was started from. Its id is read as routine_id; its name is ignored. */
+            routine?: {
+                id: string | null;
+                name: string;
+            };
+            /** @description Seconds paused between started_at and ended_at (OWS 0.2). Checked, not stored yet. */
+            paused_s?: number;
+            /** @description What a device reported for the whole session (OWS 0.2). Checked, not stored yet. */
+            totals?: {
+                duration_s?: number;
+                calories?: number;
+                heart_rate_bpm?: number;
+                reported_by?: string;
+            };
             /** @description An OWS document's source. Its external_id is read as external_id; kind and client come from your credential. */
             source?: {
                 kind?: string;
@@ -529,6 +550,13 @@ export interface components {
             calories?: number;
             /** @description Average heart rate over the set, in beats per minute. */
             heart_rate_bpm?: number;
+            /** @description Steps taken during the set, as entered or as a device reported them. Never a day's total. */
+            steps?: number;
+            /**
+             * Format: date-time
+             * @description When the set was done: marked done by the person or recorded by a device. Listed in estimates when worked out instead (sets spaced across a workout logged afterwards, say).
+             */
+            completed_at?: string;
         } & {
             [key: string]: unknown;
         };
@@ -572,6 +600,8 @@ export interface components {
             started_at: string;
             /** Format: date-time */
             ended_at?: string;
+            /** @description Whole seconds between started_at and ended_at during which the session was paused. Active time is ended_at - started_at - paused_s. Absent means unknown (read as 0); 0 means there were no pauses. */
+            paused_s?: number;
             /**
              * Format: date
              * @description The workout's local day: started_at in timezone. A reader files the workout under this day, wherever the reader is.
@@ -590,6 +620,22 @@ export interface components {
             /** @description Other records of the same session, merged into this one: the same run from two apps, say. This workout is the fullest of them. */
             merged_sources?: components["schemas"]["source"][];
             exercises: components["schemas"]["entry"][];
+            /** @description The routine this workout was started from: a label, like program. id is the routine's ID in the same log or server, or null once the routine is deleted; name is its name, so the label reads without the routine. */
+            routine?: {
+                id: string | null;
+                name: string;
+            };
+            /** @description What a device or app reported for the whole session, never a sum of the sets. A reader uses these for the session and set values for the sets, and doesn't add one to the other. */
+            totals?: {
+                /** @description The time the device recorded, which can differ from ended_at - started_at. */
+                duration_s?: number;
+                /** @description Active kilocalories, as reported. */
+                calories?: number;
+                /** @description Average heart rate over the session, in beats per minute, as reported. */
+                heart_rate_bpm?: number;
+                /** @description The device or app that reported them, e.g. Apple Watch. */
+                reported_by?: string;
+            };
             /** @description The program day this workout was part of: a label, which changes nothing else here. listed false means the program was withdrawn, and says nothing more. */
             program?: {
                 listed: boolean;

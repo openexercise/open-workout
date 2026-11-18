@@ -93,6 +93,8 @@ what an exercise is; OWS records what someone did.
 
 [`examples/lower-day.json`](../examples/lower-day.json) uses more of the schema: a local day and
 time zone, set types, an unmatched entry, cardio with device readings and an estimate.
+[`examples/watch-session.json`](../examples/watch-session.json) is a session timed on a watch: the
+routine it came from, time paused, the watch's totals, set times and a walk's steps.
 
 Only `started_at`, `source` and `exercises` are required. Unknown members are refused, except
 `x-` extensions (section 8).
@@ -104,6 +106,7 @@ Only `started_at`, `source` and `exercises` are required. Unknown members are re
 | `id` | string | Assigned by the server that stores it. Opaque: never parse it |
 | `started_at` | date-time with offset | When it started. Required |
 | `ended_at` | date-time | When it ended |
+| `paused_s` | integer seconds | Time paused between `started_at` and `ended_at` (section 6) |
 | `date` | `YYYY-MM-DD` | The local day: `started_at` in `timezone` |
 | `timezone` | IANA zone | Where it happened, such as `America/Chicago` |
 | `updated_at` | date-time | When the stored record last changed, by the server's clock. For mirroring |
@@ -112,6 +115,8 @@ Only `started_at`, `source` and `exercises` are required. Unknown members are re
 | `merged_sources` | array of `source` | Other apps' records of the same session, merged into this one |
 | `exercises` | array of entries | In the order done. Required |
 | `program` | object | The program day this workout was part of: a label only |
+| `routine` | object | The routine it was started from: `{id, name}`, a label only (section 10) |
+| `totals` | object | What a device reported for the whole session (section 4) |
 | `estimates` | array of JSON pointers | Values that were inferred, not given (section 5) |
 
 An entry:
@@ -178,6 +183,8 @@ exercise search (`GET /v1/exercises?query=…`, or the MCP tool `search_exercise
 | `distance_m` | metres | Cardio |
 | `calories` | kcal | Integer, as a device or app reported it |
 | `heart_rate_bpm` | beats per minute | Integer, the set's average, as a device or app reported it |
+| `steps` | count | Integer. Steps taken during the set (walks, hikes), as entered or reported |
+| `completed_at` | date-time with offset | When the set was done, as marked or recorded |
 
 Rules:
 
@@ -186,6 +193,21 @@ Rules:
   converted number as if it were given.
 - A set records totals. GPS tracks and per-second samples stay in the file they came from (FIT,
   GPX, TCX).
+- A set's `steps` are that set's, never a day's total: daily steps are a body metric, outside OWS.
+- `completed_at` is when the person marked the set done, or a device recorded it. A writer that
+  works one out (spacing sets across a workout logged afterwards, say) lists it in `estimates` or
+  leaves it out. Times give a reader the real rest between sets and the order sets were done in
+  across entries.
+
+A watch usually reports calories, average heart rate and duration for the whole session, not per
+set. Those go in the workout's `totals`, with `reported_by` naming the device or app:
+
+```json
+"totals": { "duration_s": 2810, "calories": 312, "heart_rate_bpm": 118, "reported_by": "Apple Watch" }
+```
+
+`totals` are as reported, never a sum the writer made of its sets, and a reader doesn't add them to
+set values: it uses `totals` for the session and set values for the sets.
 
 ## 5. Estimates
 
@@ -200,6 +222,7 @@ A pointer can name:
 - one value in a set: `/exercises/0/sets/2/reps`;
 - a set's unit: `/exercises/1/sets/0/load/unit` (the person gave a number, and the unit was
   assumed);
+- a set's time: `/exercises/0/sets/2/completed_at` (worked out, not recorded);
 - the start: `/started_at` (the writer knew only the day; trust the day, not the hour).
 
 In `examples/lower-day.json`, `"/exercises/1/sets/0/load/unit"` says the person said "60", and the
@@ -218,6 +241,11 @@ pointers.
 
 When a writer knows only the day, a server works out a start and lists `/started_at` in
 `estimates`. In the API core, a write may send `date` instead of `started_at` for that reason.
+
+- `paused_s` is the whole seconds between `started_at` and `ended_at` the session was paused, so
+  its active time is `ended_at - started_at - paused_s`. Absent means unknown, read as 0; `0` says
+  there were no pauses.
+- A set's `completed_at` is an instant with an offset, like `started_at` (section 4).
 
 ## 7. Provenance
 
@@ -308,6 +336,10 @@ for the row's shape.
 
 A routine copied from a program library carries `source` (`program_id`, `program_name`, `credit`,
 `version`). It is removed when that program is withdrawn.
+
+A workout started from a routine names it in `routine`: `{"id": "rt_01JCA2M4P7K9D", "name": "Push A"}`.
+`id` refers to a routine in the same log or server, or is `null` once that routine is deleted;
+`name` is the routine's name, so the label reads without the routine.
 
 ## 11. Logs and exports
 
@@ -425,7 +457,7 @@ bad.json: jsonschema validation failed with 'https://openworkout.dev/schema/v0/w
 1 problem(s) in 1 document(s)
 ```
 
-`examples/` holds one of each: `push-day.json` and `lower-day.json` (workouts),
+`examples/` holds one of each: `push-day.json`, `lower-day.json` and `watch-session.json` (workouts),
 `push-routine.json`, `two-day-linear.json` (a program) and `log.json`.
 
 In Go, the `conformance` package validates the documents a server returns. The schemas are also
