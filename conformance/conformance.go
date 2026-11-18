@@ -822,20 +822,26 @@ const documentZone = "America/Chicago"
 
 // document: an OWS workout document, as another app exports it, can be posted as it is. The
 // members the server assigns are ignored, x- extension members at any level are ignored,
-// source.external_id is read as external_id, and timezone, loads as {value, unit} and set types
-// are kept. The workout is deleted afterwards.
+// source.external_id is read as external_id, and timezone, ended_at, loads as {value, unit} and set
+// types are kept. The 0.2 members (routine, paused_s, totals, a set's steps and completed_at) are
+// accepted; keeping them is the server's choice. The workout is deleted afterwards.
 func (r *runner) document(ctx context.Context) error {
 	loc, err := time.LoadLocation(documentZone)
 	if err != nil {
 		return err
 	}
 	started := r.now().Add(-2 * time.Hour).In(loc).Truncate(time.Second)
+	ended := started.Add(time.Hour)
 	ext := "ows-conformance-document-" + r.run
 	doc := map[string]any{
 		"$schema":       "https://openworkout.dev/schema/v0/workout.json",
-		"ows_version":   "0.1",
+		"ows_version":   "0.2",
 		"id":            "another-apps-id",
 		"started_at":    started.Format(time.RFC3339),
+		"ended_at":      ended.Format(time.RFC3339),
+		"paused_s":      120,
+		"routine":       map[string]any{"id": "another-apps-routine", "name": "Push A"},
+		"totals":        map[string]any{"duration_s": 3480, "calories": 310, "heart_rate_bpm": 112, "reported_by": "a watch"},
 		"date":          started.Format(time.DateOnly),
 		"timezone":      documentZone,
 		"title":         "ows conformance document " + r.run,
@@ -848,7 +854,8 @@ func (r *runner) document(ctx context.Context) error {
 			"x-conformance": true,
 			"sets": []any{
 				map[string]any{"type": "warmup", "reps": 8, "load": map[string]any{"value": 60, "unit": "kg"}},
-				map[string]any{"id": "another-apps-set", "reps": 5, "load": map[string]any{"value": 100, "unit": "kg"}, "x-conformance": 1},
+				map[string]any{"id": "another-apps-set", "reps": 5, "load": map[string]any{"value": 100, "unit": "kg"}, "x-conformance": 1,
+					"steps": 0, "completed_at": started.Add(10 * time.Minute).Format(time.RFC3339)},
 			},
 		}},
 		"estimates": []any{},
@@ -872,6 +879,9 @@ func (r *runner) document(ctx context.Context) error {
 	}
 	if got := fmt.Sprint(w["timezone"]); got != documentZone {
 		return fmt.Errorf("timezone is %s, want %s as sent", got, documentZone)
+	}
+	if got, _ := w["ended_at"].(string); !sameInstant(got, ended) {
+		return fmt.Errorf("ended_at is %q, want %s as sent", got, ended.Format(time.RFC3339))
 	}
 	if got := fmt.Sprint(w["date"]); got != started.Format(time.DateOnly) {
 		return fmt.Errorf("date is %s, want %s, started_at's day in %s", got, started.Format(time.DateOnly), documentZone)
@@ -908,4 +918,10 @@ func (r *runner) document(ctx context.Context) error {
 		return errors.New("the x- members came back: writes ignore them")
 	}
 	return nil
+}
+
+// sameInstant says an RFC 3339 time names the instant want, in whatever offset it's written.
+func sameInstant(got string, want time.Time) bool {
+	t, err := time.Parse(time.RFC3339, got)
+	return err == nil && t.Equal(want)
 }

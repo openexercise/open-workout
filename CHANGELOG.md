@@ -20,6 +20,12 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Conformance:** the `document` check posts an OWS 0.2 document with `ended_at` and the 0.2
+  members. A server must accept it and keep `ended_at`; keeping the 0.2 members is its choice. A
+  server that refused `ended_at` (Lifterclub did, until this release) now fails it. The template
+  server keeps `paused_s`, `totals`, and a set's `steps` and `completed_at`.
+- **API core:** the workout write documents `ended_at`, and the 0.2 members' descriptions say what a
+  server does with them. Published from Lifterclub, which now stores all five.
 - **Schema 0.2** (#30 to #34, proposed in #35): a workout's `routine`, `paused_s` and `totals`, and
   a set's `steps` and `completed_at`, in `workout.json`, SPEC.md, the developer guide, the API
   core's workout write (which accepts all five), the Go and TypeScript clients, and a new example,

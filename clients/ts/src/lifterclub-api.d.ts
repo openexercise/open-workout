@@ -3563,11 +3563,11 @@ export interface components {
             calories?: number;
             /** @description Average heart rate over the set, only as a watch or app reported it. */
             heart_rate_bpm?: number;
-            /** @description Steps taken during the set, never a day's total (OWS 0.2). Checked, not stored yet. */
+            /** @description Steps taken during the set, never a day's total (OWS 0.2). */
             steps?: number;
             /**
              * Format: date-time
-             * @description When the set was done (OWS 0.2). Checked, not stored yet; an estimates pointer to it is ignored.
+             * @description When the set was done, as marked or recorded (OWS 0.2). One listed in estimates was worked out, and isn't kept.
              */
             completed_at?: string;
             /** @description The same as type warmup. Warm-ups don't count toward records. */
@@ -3611,6 +3611,11 @@ export interface components {
             merged_sources?: Record<string, never>[];
             /** Format: date-time */
             started_at?: string;
+            /**
+             * Format: date-time
+             * @description When the workout ended: not before started_at, and at most a day in the future.
+             */
+            ended_at?: string;
             /** @description Day in the workout's timezone, when started_at is not given. Default today. The start is then worked out and listed in estimates as /started_at. */
             date?: components["schemas"]["Date"];
             /** @description The IANA time zone the workout happened in (America/Chicago), which decides its local day. Default the person's. */
@@ -3624,9 +3629,9 @@ export interface components {
                 id: string | null;
                 name: string;
             };
-            /** @description Seconds paused between started_at and ended_at (OWS 0.2). Checked, not stored yet. */
+            /** @description Seconds paused between started_at and ended_at (OWS 0.2); no longer than the workout. */
             paused_s?: number;
-            /** @description What a device reported for the whole session (OWS 0.2). Checked, not stored yet. */
+            /** @description What a device reported for the whole session, never a sum of the sets (OWS 0.2). */
             totals?: {
                 duration_s?: number;
                 calories?: number;

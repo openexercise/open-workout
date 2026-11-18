@@ -25,7 +25,7 @@ type reference struct {
 	hooks     map[string]bool
 
 	noChallenge, noReplay, noExternalReplay, revives, loseNotes, badExport bool
-	noFeed, noTombstones, listsSecret, refusesDocuments                    bool
+	noFeed, noTombstones, listsSecret, refusesDocuments, dropsEndedAt      bool
 }
 
 func newReference() *reference {
@@ -149,6 +149,9 @@ func (s *reference) create(w http.ResponseWriter, r *http.Request) {
 	}
 	if wk["notes"] == nil {
 		delete(wk, "notes")
+	}
+	if ended, ok := in["ended_at"]; ok && !s.dropsEndedAt {
+		wk["ended_at"] = ended
 	}
 	if tz, ok := in["timezone"].(string); ok {
 		loc, _ := time.LoadLocation(tz)
@@ -289,6 +292,7 @@ func TestEachCheckCatchesItsBehaviour(t *testing.T) {
 		{"no tombstones", func(s *reference) { s.noTombstones = true }, []string{"tombstone"}},
 		{"secret listed", func(s *reference) { s.listsSecret = true }, []string{"webhooks"}},
 		{"documents refused", func(s *reference) { s.refusesDocuments = true }, []string{"document"}},
+		{"ended_at dropped", func(s *reference) { s.dropsEndedAt = true }, []string{"document"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

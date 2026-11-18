@@ -4770,8 +4770,8 @@ components:
         distance_m: { type: number, minimum: 0 }
         calories: { type: integer, minimum: 0, maximum: 20000, description: "Kilocalories, only as a machine, watch or app reported them." }
         heart_rate_bpm: { type: integer, minimum: 0, maximum: 300, description: "Average heart rate over the set, only as a watch or app reported it." }
-        steps: { type: integer, minimum: 0, maximum: 200000, description: "Steps taken during the set, never a day's total (OWS 0.2). Checked, not stored yet." }
-        completed_at: { type: string, format: date-time, description: "When the set was done (OWS 0.2). Checked, not stored yet; an estimates pointer to it is ignored." }
+        steps: { type: integer, minimum: 0, maximum: 200000, description: "Steps taken during the set, never a day's total (OWS 0.2)." }
+        completed_at: { type: string, format: date-time, description: "When the set was done, as marked or recorded (OWS 0.2). One listed in estimates was worked out, and isn't kept." }
         warmup: { type: boolean, description: "The same as type warmup. Warm-ups don't count toward records." }
         estimated: { type: boolean, description: "The values were inferred, not stated: read off a machine's screen, say." }
     ExerciseInput:
@@ -4807,6 +4807,7 @@ components:
         updated_at: { type: string, format: date-time, description: "Ignored: the server's clock sets it." }
         merged_sources: { type: array, items: { type: object }, description: "Ignored: merges are the server's." }
         started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time, description: "When the workout ended: not before started_at, and at most a day in the future." }
         date: { $ref: "#/components/schemas/Date", description: "Day in the workout's timezone, when started_at is not given. Default today. The start is then worked out and listed in estimates as /started_at." }
         timezone: { type: string, description: "The IANA time zone the workout happened in (America/Chicago), which decides its local day. Default the person's." }
         title: { type: string }
@@ -4824,11 +4825,11 @@ components:
           properties:
             id: { type: [string, "null"] }
             name: { type: string }
-        paused_s: { type: integer, minimum: 0, maximum: 86400, description: "Seconds paused between started_at and ended_at (OWS 0.2). Checked, not stored yet." }
+        paused_s: { type: integer, minimum: 0, maximum: 86400, description: "Seconds paused between started_at and ended_at (OWS 0.2); no longer than the workout." }
         totals:
           type: object
           additionalProperties: false
-          description: "What a device reported for the whole session (OWS 0.2). Checked, not stored yet."
+          description: "What a device reported for the whole session, never a sum of the sets (OWS 0.2)."
           properties:
             duration_s: { type: integer, minimum: 0, maximum: 86400 }
             calories: { type: integer, minimum: 0, maximum: 20000 }
