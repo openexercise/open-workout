@@ -21,6 +21,14 @@ type Load struct {
 	Unit  string  `json:"unit"`
 }
 
+// SessionTotals are what a device or app reported for a whole session, never a sum of the sets.
+type SessionTotals struct {
+	DurationS    *int   `json:"duration_s,omitempty"`
+	Calories     *int   `json:"calories,omitempty"`
+	HeartRateBPM *int   `json:"heart_rate_bpm,omitempty"`
+	ReportedBy   string `json:"reported_by,omitempty"`
+}
+
 // Set is one set. Estimated and UnitAssumed become JSON pointers in the workout's estimates.
 type Set struct {
 	ID           string   `json:"id"`
@@ -32,6 +40,9 @@ type Set struct {
 	DistanceM    *float64 `json:"distance_m,omitempty"`
 	Calories     *int     `json:"calories,omitempty"`
 	HeartRateBPM *int     `json:"heart_rate_bpm,omitempty"`
+	// Steps were taken during the set; CompletedAt is when it was done (OWS 0.2).
+	Steps       *int       `json:"steps,omitempty"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 
 	Estimated   bool `json:"-"`
 	UnitAssumed bool `json:"-"`
@@ -79,12 +90,15 @@ type Workout struct {
 	ID        string     `json:"id"`
 	StartedAt time.Time  `json:"started_at"`
 	EndedAt   *time.Time `json:"ended_at,omitempty"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	Title     string     `json:"title,omitempty"`
-	Notes     string     `json:"notes,omitempty"`
-	Source    Source     `json:"source"`
-	Exercises []*Entry   `json:"exercises"`
-	Estimates []string   `json:"estimates"`
+	// PausedS and Totals are OWS 0.2's: time paused, and a device's numbers for the session.
+	PausedS   *int           `json:"paused_s,omitempty"`
+	Totals    *SessionTotals `json:"totals,omitempty"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	Title     string         `json:"title,omitempty"`
+	Notes     string         `json:"notes,omitempty"`
+	Source    Source         `json:"source"`
+	Exercises []*Entry       `json:"exercises"`
+	Estimates []string       `json:"estimates"`
 	// Date is the workout's local day in Timezone; both are worked out when it's read.
 	Date     string `json:"date,omitempty"`
 	Timezone string `json:"timezone,omitempty"`
@@ -321,6 +335,8 @@ type SetInput struct {
 	DistanceM    *float64   `json:"distance_m"`
 	Calories     *int       `json:"calories"`
 	HeartRateBPM *int       `json:"heart_rate_bpm"`
+	Steps        *int       `json:"steps"`
+	CompletedAt  *time.Time `json:"completed_at"`
 	Warmup       bool       `json:"warmup"`
 	Estimated    bool       `json:"estimated"`
 }
@@ -348,7 +364,13 @@ func (l *personLog) newSet(field string, in SetInput) (*Set, error) {
 		return nil, invalid(field+".type", "use working, warmup, backoff, amrap, failure or drop")
 	}
 	st := &Set{ID: newID("st_"), Reps: in.Reps, RPE: in.RPE, DurationS: in.DurationS, DistanceM: in.DistanceM,
-		Calories: in.Calories, HeartRateBPM: in.HeartRateBPM, Estimated: in.Estimated}
+		Calories: in.Calories, HeartRateBPM: in.HeartRateBPM, Estimated: in.Estimated, CompletedAt: in.CompletedAt}
+	if in.Steps != nil {
+		if *in.Steps < 0 {
+			return nil, invalid(field+".steps", "must be 0 or more")
+		}
+		st.Steps = in.Steps
+	}
 	if in.Type != "working" {
 		st.Type = in.Type
 	}
@@ -491,6 +513,10 @@ type LogWorkoutInput struct {
 	UpdatedAt     string          `json:"updated_at"`
 	EndedAt       string          `json:"ended_at"`
 	MergedSources json.RawMessage `json:"merged_sources"`
+	// OWS 0.2: paused_s and totals are kept; routine names another app's routine, so it's ignored.
+	PausedS *int            `json:"paused_s"`
+	Totals  *SessionTotals  `json:"totals"`
+	Routine json.RawMessage `json:"routine"`
 }
 
 // LogWorkout stores a whole workout. kind is the source: mcp or api. A workout whose external_id
@@ -554,6 +580,10 @@ func (l *personLog) LogWorkout(in LogWorkoutInput, kind, client string) (Result,
 		}
 		w.EndedAt = &ended
 	}
+	if in.PausedS != nil && *in.PausedS < 0 {
+		return nil, invalid("paused_s", "must be 0 or more seconds")
+	}
+	w.PausedS, w.Totals = in.PausedS, in.Totals
 	for i, ex := range in.Exercises {
 		field := fmt.Sprintf("exercises[%d]", i)
 		name, exerciseID, err := ex.nameAndID(field, l.s.catalogue)
