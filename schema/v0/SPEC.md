@@ -42,7 +42,12 @@ MUST ignore `x-` members they don't understand.
 - **When.** `started_at` (and `ended_at`) are instants with an offset. `date` is the workout's local
   day: `started_at` in `timezone`, the IANA zone it happened in. A reader files a workout under
   `date` wherever the reader is. When a writer knows only the day, a server works the start out,
-  and lists it in `estimates` as `/started_at`: trust its day, not its hour.
+  and lists it in `estimates` as `/started_at`: trust its day, not its hour. `paused_s` is the time
+  between `started_at` and `ended_at` the session was paused, so its active time is
+  `ended_at - started_at - paused_s`. Absent means unknown, read as 0.
+- **Routine.** `routine` names the routine a workout was started from (`id`, `name`), as `program`
+  labels a program day. Its `id` refers to a routine in the same log or server, or is `null` once
+  that routine is gone; `name` is the routine's name when the workout started.
 - **Entries.** Each holds the person's own words for the exercise (`text`) and what it was matched
   to (`exercise`: `id`, `name`, `match`).
   - **Confirmed matches:** `catalogue` and `custom`.
@@ -52,11 +57,20 @@ MUST ignore `x-` members they don't understand.
   - **Loads** are `{value, unit}` in the unit the person gave (`kg` or `lb`); a reader converts, and
     MUST NOT store the converted number as given.
   - **Time and distance** are `duration_s` in seconds and `distance_m` in metres.
-  - **Device readings:** `calories` and `heart_rate_bpm` are as a device or app reported them.
+  - **Device readings:** `calories`, `heart_rate_bpm` and `steps` are as a device or app reported
+    them (or, for `steps`, as entered). A set's `steps` are the steps taken in that set, never a
+    day's total.
+  - **When.** `completed_at` is when the set was done, as the person marked it or a device recorded
+    it. One worked out instead MUST be listed in `estimates`. Entries stay in the order done
+    whether or not their sets have times.
+- **Session totals.** `totals` holds what a device or app reported for the whole session
+  (`duration_s`, `calories`, `heart_rate_bpm`, and `reported_by`). They are never a sum of the sets,
+  and a reader MUST NOT add them to set values.
 - **Estimates.** `estimates` lists JSON pointers (RFC 6901) to values that were inferred rather than
   given:
   - a set, or a value in one;
   - a set's `/load/unit` when the unit was assumed;
+  - a set's `/completed_at` when its time was worked out;
   - `/started_at`.
 
   A number not listed there was given by the person. A writer MUST NOT invent one without listing it.

@@ -6,6 +6,12 @@ RFCs in `openexercise/open-workout`.
 
 ## v0
 
+- 2026-11-18 (proposed, #30 to #34): **0.2**. A workout gains `routine` (`{id, name}`, the routine
+  it was started from, a label like `program`), `paused_s` (seconds paused between `started_at`
+  and `ended_at`) and `totals` (a device's duration, calories and average heart rate for the whole
+  session, with `reported_by`; never summed with the sets). A set gains `steps` (that set's, never
+  a day's) and `completed_at` (when it was done, listed in `estimates` when worked out). Melon
+  writes all five as `x-melon-` extensions today. Additive.
 - 2026-11-13: the MCP profile's `log_workout` names a real catalogue ID in its `exercise_id`
   example, `oec:barbell-bench-press` (it said `oec:bench-press`, which the catalogue renamed). The
   input schema's wording changed, not its shape, but conformance compares descriptions too, so a

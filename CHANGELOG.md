@@ -20,6 +20,11 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Proposed schema 0.2** (#30 to #34): a workout's `routine`, `paused_s` and `totals`, and a
+  set's `steps` and `completed_at`, in `workout.json`, SPEC.md, the developer guide, the Go client's
+  `Workout` and `Set`, and a new example, `examples/watch-session.json`. The API core, MCP profile
+  and TypeScript client follow when the change is made in Lifterclub. Additive.
+- **`x-melon-` registered** in the README's extension vendors.
 - **Extension vendors are registered:** the README gains the "Extension vendors" table SPEC.md
   section 8 points to, with `x-lifterclub-`; GOVERNANCE.md no longer links Lifterclub's private
   repository and says where `schema/CHANGELOG.md` is written.

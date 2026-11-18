@@ -13,6 +13,11 @@
     "id": { "type": "string", "description": "Assigned by the server that stores the workout." },
     "started_at": { "type": "string", "format": "date-time", "description": "When the workout started. Listed in estimates as /started_at when it was worked out (from a day alone, or the time it was logged) rather than given: trust its day, not its hour." },
     "ended_at": { "type": "string", "format": "date-time" },
+    "paused_s": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Whole seconds between started_at and ended_at during which the session was paused. Active time is ended_at - started_at - paused_s. Absent means unknown (read as 0); 0 means there were no pauses."
+    },
     "date": {
       "type": "string",
       "format": "date",
@@ -33,6 +38,27 @@
       "items": { "$ref": "#/$defs/source" }
     },
     "exercises": { "type": "array", "items": { "$ref": "#/$defs/entry" } },
+    "routine": {
+      "type": "object",
+      "description": "The routine this workout was started from: a label, like program. id is the routine's ID in the same log or server, or null once the routine is deleted; name is its name when the workout started.",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "name": { "type": "string" }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "description": "What a device or app reported for the whole session, never a sum of the sets. A reader uses these for the session and set values for the sets, and doesn't add one to the other.",
+      "additionalProperties": false,
+      "properties": {
+        "duration_s": { "type": "integer", "minimum": 0, "description": "The time the device recorded, which can differ from ended_at - started_at." },
+        "calories": { "type": "integer", "minimum": 0, "description": "Active kilocalories, as reported." },
+        "heart_rate_bpm": { "type": "integer", "minimum": 0, "description": "Average heart rate over the session, in beats per minute, as reported." },
+        "reported_by": { "type": "string", "description": "The device or app that reported them, e.g. Apple Watch." }
+      }
+    },
     "program": {
       "type": "object",
       "description": "The program day this workout was part of: a label, which changes nothing else here. listed false means the program was withdrawn, and says nothing more.",
@@ -111,7 +137,9 @@
         "duration_s": { "type": "integer", "minimum": 0 },
         "distance_m": { "type": "number", "minimum": 0 },
         "calories": { "type": "integer", "minimum": 0, "description": "Kilocalories, as a machine or app reported them." },
-        "heart_rate_bpm": { "type": "integer", "minimum": 0, "description": "Average heart rate over the set, in beats per minute." }
+        "heart_rate_bpm": { "type": "integer", "minimum": 0, "description": "Average heart rate over the set, in beats per minute." },
+        "steps": { "type": "integer", "minimum": 0, "description": "Steps taken during the set, as entered or as a device reported them. Never a day's total." },
+        "completed_at": { "type": "string", "format": "date-time", "description": "When the set was done: marked done by the person or recorded by a device. Listed in estimates when worked out instead (sets spaced across a workout logged afterwards, say)." }
       }
     },
     "load": {

@@ -23,6 +23,8 @@ type Workout struct {
 	ID         string     `json:"id,omitempty"`
 	StartedAt  time.Time  `json:"started_at"`
 	EndedAt    *time.Time `json:"ended_at,omitempty"`
+	// PausedS is the seconds between StartedAt and EndedAt the session was paused; nil is unknown.
+	PausedS *int `json:"paused_s,omitempty"`
 	// Date is the workout's local day (StartedAt in Timezone): file it under this day.
 	Date Date `json:"date,omitempty"`
 	// Timezone is the IANA zone the workout happened in.
@@ -38,6 +40,10 @@ type Workout struct {
 	Exercises     []Entry  `json:"exercises"`
 	// Program is the program day this workout was part of: a label only.
 	Program *WorkoutProgram `json:"program,omitempty"`
+	// Routine is the routine this workout was started from: a label only.
+	Routine *WorkoutRoutine `json:"routine,omitempty"`
+	// Totals are what a device reported for the whole session, never a sum of the sets.
+	Totals *SessionTotals `json:"totals,omitempty"`
 	// Estimates are JSON pointers (RFC 6901) to values inferred or assumed rather than given.
 	Estimates []string `json:"estimates,omitempty"`
 }
@@ -82,6 +88,10 @@ type Set struct {
 	DistanceM    *float64 `json:"distance_m,omitempty"`
 	Calories     *int     `json:"calories,omitempty"`
 	HeartRateBPM *int     `json:"heart_rate_bpm,omitempty"`
+	// Steps are the steps taken during the set, never a day's total.
+	Steps *int `json:"steps,omitempty"`
+	// CompletedAt is when the set was done, as marked or recorded.
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
 // Load is a weight in the unit the user gave it.
@@ -99,6 +109,21 @@ type WorkoutProgram struct {
 	Version int    `json:"version,omitempty"`
 	Day     string `json:"day,omitempty"`
 	DayName string `json:"day_name,omitempty"`
+}
+
+// WorkoutRoutine is the routine a workout was started from. ID is nil once the routine is
+// deleted; Name is its name when the workout started.
+type WorkoutRoutine struct {
+	ID   *string `json:"id"`
+	Name string  `json:"name"`
+}
+
+// SessionTotals are what a device or app reported for a whole session.
+type SessionTotals struct {
+	DurationS    *int   `json:"duration_s,omitempty"`
+	Calories     *int   `json:"calories,omitempty"`
+	HeartRateBPM *int   `json:"heart_rate_bpm,omitempty"`
+	ReportedBy   string `json:"reported_by,omitempty"`
 }
 
 // Writes.
