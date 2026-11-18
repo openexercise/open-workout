@@ -20,6 +20,14 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+Nothing yet.
+
+## clients/go/v0.3.0 and clients-ts-v0.7.0 — 2026-11-18
+
+Both clients carry Open Workout 0.2: a workout's `routine`, `paused_s` and `totals`, and a set's
+`steps` and `completed_at`, read and written. Go v0.3.0 only adds fields (`WorkoutRoutine`,
+`SessionTotals`); TypeScript 0.7.0 adds them to the core and Lifterclub types. Additive.
+
 - **Conformance:** the `document` check posts an OWS 0.2 document with `ended_at` and the 0.2
   members. A server must accept it and keep `ended_at`; keeping the 0.2 members is its choice. A
   server that refused `ended_at` (Lifterclub did, until this release) now fails it. The template
