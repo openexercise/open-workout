@@ -164,6 +164,7 @@ Producers add members named `x-<vendor>-…` (SPEC.md section 8). To register a 
 | Prefix | Who | Contact |
 | --- | --- | --- |
 | `x-lifterclub-` | Lifterclub, the reference implementation | `lifterclub.com` |
+| `x-melon-` | Melon, a strength and cardio log with an Apple Watch app | `melon.fit` |
 
 ## Relationship to other standards
 

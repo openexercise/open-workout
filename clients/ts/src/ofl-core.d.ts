@@ -94,6 +94,21 @@ export interface paths {
          *     or more than 100 g of protein, fat and carbohydrate, in 100 g is refused as numbers per
          *     serving typed as per 100 g. It's visible only to this user. If the user already has a food
          *     by that name, it's returned unchanged (200). A server may limit how many.
+         *
+         *     A packaged product the user enters (v0.3) may also carry its `gtin` (one barcode, 8 to 14
+         *     digits with a valid check digit, stored as 14), its `brand` and its `label` as printed. The
+         *     label's `nutrients_per_serving` are then the food's values, as the specification's section 5
+         *     says: with a serving weight they're worked out per 100 g and the serving becomes the default
+         *     portion; with only a volume they're per 100 ml (`nutrients_basis: "100ml"`); with neither, the
+         *     food is counted by servings (`nutrients_basis: "serving"`), never by an invented weight. A
+         *     label with a part over its whole (saturated fat over fat, sugars over carbohydrate) is
+         *     refused (`invalid_input` on `label.nutrients_per_serving`). `nutrients_per_100ml` gives a
+         *     drink's values directly. Give the values one way only. Reading that barcode as a `gtin:` ID
+         *     (`GET /v1/foods/gtin:…`) then finds this food first, for this user only.
+         *
+         *     With a `gtin`: if the user already has a food with that barcode, that food comes back
+         *     (200), whatever its name. If they have a food by this name without it, the request is
+         *     refused (`invalid_input` on `name`).
          */
         post: operations["createFood"];
         delete?: never;
@@ -484,7 +499,10 @@ export interface paths {
         /**
          * One food
          * @description A catalogue food with its portions, aliases and sources, or one of the user's own. A retired
-         *     catalogue food is still returned, since meals may name it.
+         *     catalogue food is still returned, since meals may name it. A `gtin:` ID is answered first by
+         *     the user's own food carrying that barcode, under its own ID (v0.3): log it by that ID. One of
+         *     the user's own foods they deleted still reads, with `status: "deprecated"`, since meals may
+         *     name it.
          */
         get: operations["getFood"];
         put?: never;
@@ -616,7 +634,7 @@ export interface components {
             instructions?: string;
             notes?: string;
         };
-        /** @description An Open Food Log v0.2 recipe (https://openfoodlog.org/schema/v0/recipe.json). */
+        /** @description An Open Food Log recipe (https://openfoodlog.org/schema/v0/recipe.json). */
         Recipe: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/recipe.json";
@@ -664,7 +682,7 @@ export interface components {
              */
             from_meal_id?: string;
         };
-        /** @description An Open Food Log v0.2 saved meal (https://openfoodlog.org/schema/v0/saved-meal.json). */
+        /** @description An Open Food Log saved meal (https://openfoodlog.org/schema/v0/saved-meal.json; v0.2). */
         SavedMeal: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/saved-meal.json";
@@ -770,11 +788,11 @@ export interface components {
             confidence?: number | null;
             notes?: string | null;
         };
-        /** @description An Open Food Log v0.2 meal (https://openfoodlog.org/schema/v0/meal.json). */
+        /** @description An Open Food Log meal (https://openfoodlog.org/schema/v0/meal.json). */
         Meal: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/meal.json";
-            /** @description The Open Food Log version, as MAJOR.MINOR: 0.2. */
+            /** @description The Open Food Log version, as MAJOR.MINOR: 0.3. */
             ofl_version: string;
             /** Format: uuid */
             id: string;
@@ -977,8 +995,8 @@ export interface components {
         Targets: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/targets.json";
-            /** @constant */
-            ofl_version: "0.2";
+            /** @description The Open Food Log version, as MAJOR.MINOR: 0.3. */
+            ofl_version: string;
             /** Format: date-time */
             updated_at?: string;
             targets: components["schemas"]["Target"][];
@@ -1112,9 +1130,9 @@ export interface components {
             /** @description The amount to assume when a person names the food without one. At most one. */
             is_default?: boolean;
         };
-        /** @description An Open Food Log v0.2 food (https://openfoodlog.org/schema/v0/food.json). */
+        /** @description An Open Food Log food (https://openfoodlog.org/schema/v0/food.json). */
         Food: {
-            /** @description On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.2. */
+            /** @description On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.3. */
             ofl_version?: string;
             id: string;
             name: string;
@@ -1123,6 +1141,11 @@ export interface components {
              * @enum {string}
              */
             kind: "generic" | "branded" | "custom";
+            /**
+             * @description deprecated: one of the user's own foods they deleted, still read because meals may name it. Left out when active.
+             * @enum {string}
+             */
+            status?: "active" | "deprecated" | "replaced";
             brand?: string;
             gtin?: string[];
             aliases?: {
@@ -1193,7 +1216,7 @@ export interface components {
             identifiers?: {
                 /** @description USDA FoodData Central's ID. */
                 fdc_id?: number;
-                /** @description The Open Food Facts product code, for a gtin: food. */
+                /** @description The Open Food Facts product code, for a gtin: food looked up there. */
                 off_code?: string;
             };
             provenance?: {
@@ -1227,19 +1250,33 @@ export interface components {
         FoodMatch: {
             id: string;
             name: string;
-            /** @enum {string} */
-            kind: "generic" | "custom";
+            /**
+             * @description branded is a packaged product named by its barcode (a gtin: ID).
+             * @enum {string}
+             */
+            kind: "generic" | "custom" | "branded";
+            /** @description A branded product's brand. */
+            brand?: string;
+            /** @description Empty for a product whose label gives values per 100 ml: see nutrients_per_100ml. */
             nutrients_per_100g: components["schemas"]["FoodNutrients"];
+            nutrients_per_100ml?: components["schemas"]["FoodNutrients"];
             is_reviewed: boolean;
-            /** @description 1 for a whole name, 0.95 a whole alias, 0.9 a name that starts with the word, else similarity of spelling, at most 0.85. */
+            /** @description 1 for a whole name, 0.95 a whole alias, 0.9 a name that starts with the word, else similarity of spelling, at most 0.85. A branded product, listed after other foods of its score, scores at most 0.8, or 0.85 when the query names its brand, so it never matches surely from words. */
             score: number;
         };
-        /** @description Give nutrients_per_100g, or nutrients_per_serving with serving. */
+        /** @description Give nutrients_per_100g, nutrients_per_100ml, nutrients_per_serving with serving, or a label with its nutrients_per_serving. */
         FoodRequest: {
             name: string;
+            brand?: string;
+            /** @description The package's barcode: 8, 12, 13 or 14 digits with a valid check digit (gtin: in front is accepted). Stored as 14 digits. */
+            gtin?: string;
             nutrients_per_100g?: components["schemas"]["FoodNutrients"];
+            /** @description A drink's values per 100 ml. */
+            nutrients_per_100ml?: components["schemas"]["FoodNutrients"];
             nutrients_per_serving?: components["schemas"]["FoodNutrients"];
             serving?: components["schemas"]["FoodPortion"];
+            /** @description The package's label as printed. With nutrients_per_serving, those are the food's values. */
+            label?: components["schemas"]["FoodLabel"];
             density_g_per_ml?: number;
             portions?: components["schemas"]["FoodPortion"][];
         };

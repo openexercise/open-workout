@@ -1,0 +1,37 @@
+{
+  "$schema": "https://openworkout.dev/schema/v0/workout.json",
+  "ows_version": "0.2",
+  "id": "wk_01JCF4R8N2V7X",
+  "started_at": "2026-11-12T17:30:00-06:00",
+  "ended_at": "2026-11-12T18:31:00-06:00",
+  "date": "2026-11-12",
+  "timezone": "America/Chicago",
+  "title": "Push A",
+  "paused_s": 240,
+  "source": { "kind": "app", "client": "myapp", "external_id": "myapp-981" },
+  "routine": { "id": "rt_01JCA2M4P7K9D", "name": "Push A" },
+  "totals": { "duration_s": 3410, "calories": 388, "heart_rate_bpm": 116, "reported_by": "Apple Watch" },
+  "exercises": [
+    {
+      "exercise": { "id": "oec:barbell-bench-press", "name": "Barbell Bench Press", "match": "catalogue" },
+      "sets": [
+        { "reps": 8, "load": { "value": 185, "unit": "lb" }, "completed_at": "2026-11-12T17:36:10-06:00" },
+        { "reps": 8, "load": { "value": 185, "unit": "lb" }, "completed_at": "2026-11-12T17:39:45-06:00" },
+        { "reps": 7, "load": { "value": 185, "unit": "lb" }, "completed_at": "2026-11-12T17:43:20-06:00" }
+      ]
+    },
+    {
+      "exercise": { "id": "oec:barbell-overhead-press", "name": "Barbell Overhead Press", "match": "catalogue" },
+      "sets": [
+        { "reps": 10, "load": { "value": 95, "unit": "lb" }, "completed_at": "2026-11-12T17:50:05-06:00" },
+        { "reps": 9, "load": { "value": 95, "unit": "lb" } }
+      ]
+    },
+    {
+      "exercise": { "id": "oec:walking", "name": "Walking", "match": "catalogue" },
+      "text": "cool-down walk",
+      "sets": [ { "duration_s": 1200, "distance_m": 1600, "steps": 2150, "completed_at": "2026-11-12T18:30:40-06:00" } ]
+    }
+  ],
+  "estimates": []
+}
