@@ -20,7 +20,12 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
-Nothing yet.
+- **Lifterclub's body weight and Live Activity in the reference API and tool profile** (published from
+  Lifterclub): `api/v1.yaml` gains `/v1/body-weights` (opt-in, Lifterclub's own, in no core),
+  `tracks_weight` and `weight_consent` on `/v1/me` and the profile, and `PUT /v1/live-activity`;
+  `mcp/tools.json` gains the Lifterclub-profile tools `log_body_weight` and `get_body_weights`, and
+  `update_profile` takes `tracks_weight`. The Lifterclub types in the TypeScript client follow; the
+  Open Workout core and its tools are unchanged.
 
 ## clients/go/v0.3.0 and clients-ts-v0.7.0 — 2026-11-18
 

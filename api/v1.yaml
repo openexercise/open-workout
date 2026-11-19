@@ -343,6 +343,42 @@ paths:
               schema: { $ref: "#/components/schemas/Problem" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/live-activity:
+    put:
+      operationId: putLiveActivity
+      summary: Push a Live Activity back to the clock when a rest ends
+      description: |
+        Lifterclub's iOS app, in gym mode: while a rest runs, it sends its Live Activity's push token
+        and the state to show when the rest ends, and the server pushes that state through Apple's
+        push service (APNs) at `ends_at`, so the Lock Screen goes back to the session's clock with the
+        app away. A newer rest replaces this one. The state is the clock and the number of sets only,
+        never an exercise or a weight; anything else is refused. Without an APNs key on the server
+        (`/v1/me` `live_activity_push: false`), the body is checked and nothing is stored.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LiveActivityRest" }
+      responses:
+        "204": { description: Stored, and the push queued for the rest's end. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteLiveActivity
+      summary: Forget the rest
+      description: The rest was cut short with no new one, or the workout ended; nothing will be pushed.
+      tags: [Workouts]
+      security: [{ oauth2: [workouts:write] }]
+      responses:
+        "204": { description: Forgotten (or there was nothing). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/parse:
     post:
       operationId: parse
@@ -2049,6 +2085,144 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "429": { $ref: "#/components/responses/RateLimited" }
 
+  /v1/body-weights:
+    get:
+      operationId: listBodyWeights
+      summary: The user's body weights
+      description: |
+        Lifterclub's own, in no standard's core (docs/body-weight.md). Weights measured on the days
+        `from`..`to` (YYYY-MM-DD in the user's timezone, inclusive; the last 90 days by default, a year
+        at most), newest first. While the user hasn't turned weight on (`tracks_weight`), the list is
+        empty whatever is stored. In calm mode each weight keeps its time and leaves out its numbers
+        (`is_hidden`).
+
+        With `updated_since`, this is the change feed for apps that sync: every weight changed at or
+        after that time, deletes included (with `deleted_at`), oldest change first, 100 at a time, with
+        `next_cursor` while there are more. `from` and `to` are ignored.
+      tags: [Profile]
+      security: [{ oauth2: [profile:read] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: updated_since, in: query, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, schema: { type: string }, description: "The `next_cursor` of the page before; only with `updated_since`." }
+      responses:
+        "200":
+          description: The weights, or the changes.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/BodyWeightList"
+                  - $ref: "#/components/schemas/BodyWeightChanges"
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    post:
+      operationId: logBodyWeight
+      summary: Log a body weight
+      description: |
+        The user's own number, never worked out. `unit` defaults to the user's units; it's stored in
+        kilograms to the nearest 10 g, between 20 and 400 kg. `measured_at` defaults to now and may be
+        at most 5 minutes ahead. Needs `tracks_weight` on (else `invalid_input` on `tracks_weight`) and
+        health-data consent that names body weight (version 2026-11-19 or later; else
+        `consent_required`). An app's `external_id` replays its first weight for ever, and one the user
+        deleted here stays deleted (`not_found`). `from_health` marks a weight an app read from Apple
+        Health.
+      tags: [Profile]
+      security: [{ oauth2: [profile:write] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BodyWeightInput" }
+      responses:
+        "201":
+          description: Logged.
+          headers:
+            Location: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BodyWeightWritten" }
+        "200":
+          description: A replay of an earlier `Idempotency-Key` or `external_id`.
+          headers:
+            Location: { schema: { type: string } }
+            Idempotent-Replayed: { schema: { type: string, enum: ["true"] } }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BodyWeightWritten" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound", description: "A weight with this `external_id` was deleted here and stays deleted." }
+        "422": { $ref: "#/components/responses/Unprocessable", description: "`idempotency_conflict`." }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      operationId: deleteAllBodyWeights
+      summary: Delete every body weight
+      description: Removes all of the user's weights. They stay in the export as deleted, as one deleted alone does.
+      tags: [Profile]
+      security: [{ oauth2: [profile:write] }]
+      responses:
+        "200":
+          description: How many were deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: integer, minimum: 0 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/body-weights/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    delete:
+      operationId: deleteBodyWeight
+      summary: Delete a body weight
+      description: Restorable for 10 minutes (`POST /v1/body-weights/{id}/restore`).
+      tags: [Profile]
+      security: [{ oauth2: [profile:write] }]
+      responses:
+        "204": { description: Deleted. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/body-weights/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: restoreBodyWeight
+      summary: Restore a deleted body weight
+      tags: [Profile]
+      security: [{ oauth2: [profile:write] }]
+      responses:
+        "200":
+          description: The weight, back.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BodyWeightWritten" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "410":
+          description: "`undo_unavailable`: not deleted, or deleted more than 10 minutes ago."
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
   /v1/targets:
     get:
       operationId: getTargets
@@ -2849,6 +3023,37 @@ components:
         meal_photos: { type: boolean, description: "This server reads meal photos. When false, a photo is refused as photo_unread: offer typing instead of a camera." }
         label_photos: { type: boolean, description: "This server reads photos of food labels (POST /v1/foods/label). When false, offer typing the label's numbers instead." }
         workouts: { type: boolean, description: "The apps show the workout log here. When false, Lifterclub's own apps hide workouts for a nutrition-first launch; the API still serves them." }
+        live_activity_push: { type: boolean, description: "This server pushes the iOS app's Live Activity back to the clock when a rest ends (PUT /v1/live-activity). When false, start the activity without a push token." }
+        tracks_weight: { type: boolean, description: "The user turned body weight on. Off by default; while off, hide every weight." }
+        weight_consent: { type: boolean, description: "The consent in force names body weight, so a weight will be stored: one from before 2026-11-19 doesn't. Ask before the first weight." }
+
+    LiveActivityRest:
+      type: object
+      additionalProperties: false
+      required: [push_token, environment, ends_at, state]
+      properties:
+        push_token: { type: string, pattern: "^[0-9a-f]{16,512}$", description: "The Live Activity's push token, lowercase hex." }
+        environment: { enum: [sandbox, production], description: "The APNs environment the app was built for: sandbox for debug builds, production for TestFlight and the App Store." }
+        ends_at: { type: string, format: date-time, description: When the rest ends and the push goes; within the next hour. }
+        state:
+          type: object
+          description: "The activity's content state to push, as the app encodes it: the session's clock (`timer.elapsed.since`, seconds since 2001-01-01, Foundation's reference date) and the sets."
+          additionalProperties: false
+          required: [timer, sets, setsLabel]
+          properties:
+            timer:
+              type: object
+              additionalProperties: false
+              required: [elapsed]
+              properties:
+                elapsed:
+                  type: object
+                  additionalProperties: false
+                  required: [since]
+                  properties:
+                    since: { type: number }
+            sets: { type: string, pattern: "^[0-9]{1,4}$" }
+            setsLabel: { type: string, maxLength: 24, description: "\"Sets\" in the app's language." }
 
     WorkoutList:
       type: object
@@ -3257,13 +3462,19 @@ components:
     LogExport:
       x-ows-core-as: OWSExport
       x-ofl-core-as: OFLExport
-      description: What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` with `profile:read`. Each workout started from one of the person's routines names it in its OWS `routine` label.
+      description: What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` and `body_weights` with `profile:read`. Each workout started from one of the person's routines names it in its OWS `routine` label.
       type: object
       required: [exported_at, consents]
       properties:
         ows_version: { type: string, description: "The OWS version of the log, with workouts:read (0.1)." }
         exported_at: { type: string, format: date-time }
         profile: { $ref: "#/components/schemas/Profile" }
+        body_weights:
+          x-ows-core: false
+          x-ofl-core: false
+          description: "Every body weight, oldest first, deleted ones too (with `deleted_at`), numbers whatever calm mode says; with `profile:read` only. (Lifterclub's own.)"
+          type: array
+          items: { $ref: "#/components/schemas/BodyWeight" }
         ofl_version: { type: string, description: "With `meals:read`: the Open Food Log version the food log's keys (foods, meals, deleted_meals) are written to, 0.3. They make an OFL log too." }
         foods:
           description: The person's own foods (`usr:`), as Open Food Log foods, oldest first; with `meals:read` only.
@@ -3767,9 +3978,62 @@ components:
           items: { $ref: "#/components/schemas/Set" }
         summary: { type: string }
 
+    BodyWeight:
+      type: object
+      required: [id, measured_at, date, timezone, weight_kg, weight, unit, is_hidden, source, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        measured_at: { type: string, format: date-time }
+        date: { type: string, format: date, description: The local day it was measured, in `timezone`. }
+        timezone: { type: string }
+        weight_kg: { type: [number, "null"], description: "Null in calm mode." }
+        weight: { type: [number, "null"], description: "In `unit`, the user's units; null in calm mode." }
+        unit: { enum: [kg, lb] }
+        is_hidden: { type: boolean, description: "Calm mode left the numbers out." }
+        source:
+          type: object
+          required: [kind]
+          properties:
+            kind: { enum: [app, api, health], description: "The web app, another app, or Apple Health read by an app." }
+            client: { type: string }
+        external_id: { type: string }
+        updated_at: { type: string, format: date-time }
+        deleted_at: { type: string, format: date-time, description: Only in the change feed and the export. }
+    BodyWeightInput:
+      type: object
+      additionalProperties: false
+      required: [weight]
+      properties:
+        weight: { type: number, exclusiveMinimum: 0 }
+        unit: { enum: [kg, lb], description: "Defaults to the user's units." }
+        measured_at: { type: string, format: date-time, description: Defaults to now. }
+        timezone: { type: string, description: "IANA name; defaults to the user's." }
+        external_id: { type: string, maxLength: 200, description: "The writing app's own ID, such as an Apple Health sample's UUID." }
+        from_health: { type: boolean, description: "The app read this weight from Apple Health." }
+    BodyWeightWritten:
+      type: object
+      required: [weight]
+      properties:
+        weight: { $ref: "#/components/schemas/BodyWeight" }
+    BodyWeightList:
+      type: object
+      required: [is_tracking, from, to, calm_mode, weights]
+      properties:
+        is_tracking: { type: boolean, description: "False while weight is off: then `weights` is empty." }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        calm_mode: { type: boolean }
+        weights: { type: array, items: { $ref: "#/components/schemas/BodyWeight" } }
+    BodyWeightChanges:
+      type: object
+      required: [is_tracking, weights]
+      properties:
+        is_tracking: { type: boolean }
+        weights: { type: array, items: { $ref: "#/components/schemas/BodyWeight" } }
+        next_cursor: { type: string }
     Profile:
       type: object
-      required: [display_name, units, timezone, goals, equipment, limitations, training_days, calm_mode, program_suggestions, program_counts, program_counts_available, health_consent, summary, language]
+      required: [display_name, units, timezone, goals, equipment, limitations, training_days, calm_mode, program_suggestions, program_counts, program_counts_available, tracks_weight, health_consent, summary, language]
       properties:
         display_name: { type: string }
         units: { $ref: "#/components/schemas/Unit" }
@@ -3781,6 +4045,7 @@ components:
         program_counts: { type: boolean, description: "The separate opt-in to being counted in a program's public total." }
         program_counts_available: { type: boolean, description: "False until public counts are turned on: don't ask before then." }
         program_suggestions: { type: boolean, description: Whether suggestions that workouts look like a known program may appear. }
+        tracks_weight: { type: boolean, description: "The user turned body weight on (off by default). Off hides it; nothing is deleted." }
         calm_mode: { type: boolean, description: "The user hides records, totals and progress numbers; don't volunteer them." }
         language: { type: [string, "null"], enum: [en, es, fr, de, null], description: "The language the web app shows, or null to follow the browser. Sentence logging, assistants and the server's own pages stay English." }
         health_consent: { type: boolean, description: Whether workouts can be logged. }
@@ -4921,6 +5186,7 @@ components:
         timezone: { type: string, description: "IANA name, e.g. America/New_York." }
         program_counts: { type: boolean }
         program_suggestions: { type: boolean }
+        tracks_weight: { type: boolean, description: "Show body weight (off by default). Turning it off keeps every weight." }
         calm_mode: { type: boolean, description: "Hide records, totals and progress numbers." }
         language: { type: string, enum: [en, es, fr, de, ""], description: "The language the web app shows; an empty string goes back to following the browser." }
         goals: { type: string }

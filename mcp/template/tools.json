@@ -202,6 +202,33 @@
     },
     {
       "_meta": {
+        "dev.openworkout/profile": "lifterclub"
+      },
+      "annotations": {
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "The user's body weights over some days, newest first. Empty while body weight is off. In calm mode the numbers are left out: say that weights were logged, not what they were. Weights are the user's own numbers. Don't comment on whether they went up or down, suggest a goal weight or link a weight to food or training unless the user asks.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "description": "first day, YYYY-MM-DD in the user's timezone; default 90 days before to",
+            "type": "string"
+          },
+          "to": {
+            "description": "last day, YYYY-MM-DD; default today",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "name": "get_body_weights",
+      "title": "Get body weights"
+    },
+    {
+      "_meta": {
         "dev.openworkout/profile": "core"
       },
       "annotations": {
@@ -416,6 +443,44 @@
       },
       "name": "link_workout_to_program",
       "title": "Link a workout to a program"
+    },
+    {
+      "_meta": {
+        "dev.openworkout/profile": "lifterclub"
+      },
+      "annotations": {
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Log a body weight the user gave you. Only a number they stated: never estimate one. Body weight is off until the user turns it on (update_profile tracks_weight), and needs their health-data consent naming it. Weights are the user's own numbers. Don't comment on whether they went up or down, suggest a goal weight or link a weight to food or training unless the user asks.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotency_key": {
+            "description": "any unique string; retrying with the same key never logs twice",
+            "type": "string"
+          },
+          "measured_at": {
+            "description": "when it was measured, RFC 3339; leave out for now",
+            "type": "string"
+          },
+          "unit": {
+            "description": "kg or lb; leave out to use the user's units",
+            "type": "string"
+          },
+          "weight": {
+            "description": "the weight the user gave",
+            "type": "number"
+          }
+        },
+        "required": [
+          "weight"
+        ],
+        "type": "object"
+      },
+      "name": "log_body_weight",
+      "title": "Log body weight"
     },
     {
       "_meta": {
@@ -923,6 +988,10 @@
           "timezone": {
             "description": "IANA timezone such as America/New_York; dates like 'today' use it",
             "type": "string"
+          },
+          "tracks_weight": {
+            "description": "true only when the user asks to track their body weight; false hides it and keeps what's logged",
+            "type": "boolean"
           },
           "training_days": {
             "description": "days they train, e.g. mon, wed, fri; replaces the old list",
