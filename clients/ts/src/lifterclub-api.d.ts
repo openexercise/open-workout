@@ -188,6 +188,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/live-activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Push a Live Activity back to the clock when a rest ends
+         * @description Lifterclub's iOS app, in gym mode: while a rest runs, it sends its Live Activity's push token
+         *     and the state to show when the rest ends, and the server pushes that state through Apple's
+         *     push service (APNs) at `ends_at`, so the Lock Screen goes back to the session's clock with the
+         *     app away. A newer rest replaces this one. The state is the clock and the number of sets only,
+         *     never an exercise or a weight; anything else is refused. Without an APNs key on the server
+         *     (`/v1/me` `live_activity_push: false`), the body is checked and nothing is stored.
+         */
+        put: operations["putLiveActivity"];
+        post?: never;
+        /**
+         * Forget the rest
+         * @description The rest was cut short with no new one, or the workout ended; nothing will be pushed.
+         */
+        delete: operations["deleteLiveActivity"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/parse": {
         parameters: {
             query?: never;
@@ -1271,6 +1300,89 @@ export interface paths {
         patch: operations["updateMealItem"];
         trace?: never;
     };
+    "/v1/body-weights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The user's body weights
+         * @description Lifterclub's own, in no standard's core (docs/body-weight.md). Weights measured on the days
+         *     `from`..`to` (YYYY-MM-DD in the user's timezone, inclusive; the last 90 days by default, a year
+         *     at most), newest first. While the user hasn't turned weight on (`tracks_weight`), the list is
+         *     empty whatever is stored. In calm mode each weight keeps its time and leaves out its numbers
+         *     (`is_hidden`).
+         *
+         *     With `updated_since`, this is the change feed for apps that sync: every weight changed at or
+         *     after that time, deletes included (with `deleted_at`), oldest change first, 100 at a time, with
+         *     `next_cursor` while there are more. `from` and `to` are ignored.
+         */
+        get: operations["listBodyWeights"];
+        put?: never;
+        /**
+         * Log a body weight
+         * @description The user's own number, never worked out. `unit` defaults to the user's units; it's stored in
+         *     kilograms to the nearest 10 g, between 20 and 400 kg. `measured_at` defaults to now and may be
+         *     at most 5 minutes ahead. Needs `tracks_weight` on (else `invalid_input` on `tracks_weight`) and
+         *     health-data consent that names body weight (version 2026-11-19 or later; else
+         *     `consent_required`). An app's `external_id` replays its first weight for ever, and one the user
+         *     deleted here stays deleted (`not_found`). `from_health` marks a weight an app read from Apple
+         *     Health.
+         */
+        post: operations["logBodyWeight"];
+        /**
+         * Delete every body weight
+         * @description Removes all of the user's weights. They stay in the export as deleted, as one deleted alone does.
+         */
+        delete: operations["deleteAllBodyWeights"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/body-weights/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a body weight
+         * @description Restorable for 10 minutes (`POST /v1/body-weights/{id}/restore`).
+         */
+        delete: operations["deleteBodyWeight"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/body-weights/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore a deleted body weight */
+        post: operations["restoreBodyWeight"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/targets": {
         parameters: {
             query?: never;
@@ -1755,6 +1867,37 @@ export interface components {
             label_photos?: boolean;
             /** @description The apps show the workout log here. When false, Lifterclub's own apps hide workouts for a nutrition-first launch; the API still serves them. */
             workouts?: boolean;
+            /** @description This server pushes the iOS app's Live Activity back to the clock when a rest ends (PUT /v1/live-activity). When false, start the activity without a push token. */
+            live_activity_push?: boolean;
+            /** @description The user turned body weight on. Off by default; while off, hide every weight. */
+            tracks_weight?: boolean;
+            /** @description The consent in force names body weight, so a weight will be stored: one from before 2026-11-19 doesn't. Ask before the first weight. */
+            weight_consent?: boolean;
+        };
+        LiveActivityRest: {
+            /** @description The Live Activity's push token, lowercase hex. */
+            push_token: string;
+            /**
+             * @description The APNs environment the app was built for: sandbox for debug builds, production for TestFlight and the App Store.
+             * @enum {unknown}
+             */
+            environment: "sandbox" | "production";
+            /**
+             * Format: date-time
+             * @description When the rest ends and the push goes; within the next hour.
+             */
+            ends_at: string;
+            /** @description The activity's content state to push, as the app encodes it: the session's clock (`timer.elapsed.since`, seconds since 2001-01-01, Foundation's reference date) and the sets. */
+            state: {
+                timer: {
+                    elapsed: {
+                        since: number;
+                    };
+                };
+                sets: string;
+                /** @description "Sets" in the app's language. */
+                setsLabel: string;
+            };
         };
         WorkoutList: {
             /** @description First day listed; absent in the change feed. */
@@ -2069,13 +2212,15 @@ export interface components {
                 meal: components["schemas"]["Meal"];
             }[];
         };
-        /** @description What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` with `profile:read`. Each workout started from one of the person's routines names it in its OWS `routine` label. */
+        /** @description What the credential may read. `workouts`, `deleted_workouts`, `routines`, `exercises`, `exercise_phrases`, `program_enrollments`, `program_suggestions_dismissed` and `imports` come with `workouts:read`; `meals`, `deleted_meals`, `foods`, `recipes`, `saved_meals`, `targets` and `food_phrases` with `meals:read`; `profile` and `body_weights` with `profile:read`. Each workout started from one of the person's routines names it in its OWS `routine` label. */
         LogExport: {
             /** @description The OWS version of the log, with workouts:read (0.1). */
             ows_version?: string;
             /** Format: date-time */
             exported_at: string;
             profile?: components["schemas"]["Profile"];
+            /** @description Every body weight, oldest first, deleted ones too (with `deleted_at`), numbers whatever calm mode says; with `profile:read` only. (Lifterclub's own.) */
+            body_weights?: components["schemas"]["BodyWeight"][];
             /** @description With `meals:read`: the Open Food Log version the food log's keys (foods, meals, deleted_meals) are written to, 0.3. They make an OFL log too. */
             ofl_version?: string;
             /** @description The person's own foods (`usr:`), as Open Food Log foods, oldest first; with `meals:read` only. */
@@ -2506,6 +2651,79 @@ export interface components {
             sets: components["schemas"]["set"][];
             summary: string;
         };
+        BodyWeight: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            measured_at: string;
+            /**
+             * Format: date
+             * @description The local day it was measured
+             */
+            date: string;
+            timezone: string;
+            /** @description Null in calm mode. */
+            weight_kg: number | null;
+            /** @description In `unit`, the user's units; null in calm mode. */
+            weight: number | null;
+            /** @enum {unknown} */
+            unit: "kg" | "lb";
+            /** @description Calm mode left the numbers out. */
+            is_hidden: boolean;
+            source: {
+                /**
+                 * @description The web app, another app, or Apple Health read by an app.
+                 * @enum {unknown}
+                 */
+                kind: "app" | "api" | "health";
+                client?: string;
+            };
+            external_id?: string;
+            /** Format: date-time */
+            updated_at: string;
+            /**
+             * Format: date-time
+             * @description Only in the change feed and the export.
+             */
+            deleted_at?: string;
+        };
+        BodyWeightInput: {
+            weight: number;
+            /**
+             * @description Defaults to the user's units.
+             * @enum {unknown}
+             */
+            unit?: "kg" | "lb";
+            /**
+             * Format: date-time
+             * @description Defaults to now.
+             */
+            measured_at?: string;
+            /** @description IANA name; defaults to the user's. */
+            timezone?: string;
+            /** @description The writing app's own ID, such as an Apple Health sample's UUID. */
+            external_id?: string;
+            /** @description The app read this weight from Apple Health. */
+            from_health?: boolean;
+        };
+        BodyWeightWritten: {
+            weight: components["schemas"]["BodyWeight"];
+        };
+        BodyWeightList: {
+            /** @description False while weight is off: then `weights` is empty. */
+            is_tracking: boolean;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            calm_mode: boolean;
+            weights: components["schemas"]["BodyWeight"][];
+        };
+        BodyWeightChanges: {
+            is_tracking: boolean;
+            weights: components["schemas"]["BodyWeight"][];
+            next_cursor?: string;
+        };
         Profile: {
             display_name: string;
             units: components["schemas"]["Unit"];
@@ -2521,6 +2739,8 @@ export interface components {
             program_counts_available: boolean;
             /** @description Whether suggestions that workouts look like a known program may appear. */
             program_suggestions: boolean;
+            /** @description The user turned body weight on (off by default). Off hides it; nothing is deleted. */
+            tracks_weight: boolean;
             /** @description The user hides records, totals and progress numbers; don't volunteer them. */
             calm_mode: boolean;
             /**
@@ -3707,6 +3927,8 @@ export interface components {
             timezone?: string;
             program_counts?: boolean;
             program_suggestions?: boolean;
+            /** @description Show body weight (off by default). Turning it off keeps every weight. */
+            tracks_weight?: boolean;
             /** @description Hide records, totals and progress numbers. */
             calm_mode?: boolean;
             /**
@@ -4523,6 +4745,53 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    putLiveActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LiveActivityRest"];
+            };
+        };
+        responses: {
+            /** @description Stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteLiveActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Forgotten (or there was nothing). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             429: components["responses"]["RateLimited"];
         };
     };
@@ -6409,6 +6678,169 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    listBodyWeights: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                updated_since?: string;
+                /** @description The `next_cursor` of the page before; only with `updated_since`. */
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The weights, or the changes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyWeightList"] | components["schemas"]["BodyWeightChanges"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    logBodyWeight: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Any unique string, up to 200 characters. Retrying with the same key never writes twice. */
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BodyWeightInput"];
+            };
+        };
+        responses: {
+            /** @description A replay of an earlier `Idempotency-Key` or `external_id`. */
+            200: {
+                headers: {
+                    Location?: string;
+                    "Idempotent-Replayed"?: "true";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyWeightWritten"];
+                };
+            };
+            /** @description Logged. */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyWeightWritten"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            /** @description A weight with this `external_id` was deleted here and stays deleted. */
+            404: components["responses"]["NotFound"];
+            /** @description `idempotency_conflict`. */
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteAllBodyWeights: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    deleteBodyWeight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["RateLimited"];
+        };
+    };
+    restoreBodyWeight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The weight, back. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyWeightWritten"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description `undo_unavailable`: not deleted, or deleted more than 10 minutes ago. */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             429: components["responses"]["RateLimited"];
         };
     };
