@@ -20,6 +20,15 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+## clients-ts-v0.8.0 — 2026-11-22
+
+The TypeScript client carries Open Food Log v0.4's nutrients in its `/openfoodlog` entry and
+Lifterclub's body weights and Live Activity push in its `/lifterclub` entry. Additive since 0.7.0; the
+Open Workout core is unchanged, and the Go client stays at v0.3.0.
+
+- **Open Food Log core v0.4** (`api/ofl-core.yaml`, published from Lifterclub): 33 more nutrient keys,
+  85 in all: the 18 amino acids, six single sugars, `la_g`, `dpa_g`, retinol and five carotenoids, and
+  `fluoride_ug`. The client's OFL types follow.
 - **Lifterclub's body weight and Live Activity in the reference API and tool profile** (published from
   Lifterclub): `api/v1.yaml` gains `/v1/body-weights` (opt-in, Lifterclub's own, in no core),
   `tracks_weight` and `weight_consent` on `/v1/me` and the profile, and `PUT /v1/live-activity`;

@@ -2221,7 +2221,7 @@ export interface components {
             profile?: components["schemas"]["Profile"];
             /** @description Every body weight, oldest first, deleted ones too (with `deleted_at`), numbers whatever calm mode says; with `profile:read` only. (Lifterclub's own.) */
             body_weights?: components["schemas"]["BodyWeight"][];
-            /** @description With `meals:read`: the Open Food Log version the food log's keys (foods, meals, deleted_meals) are written to, 0.3. They make an OFL log too. */
+            /** @description With `meals:read`: the Open Food Log version the food log's keys (foods, meals, deleted_meals) are written to, 0.4. They make an OFL log too. */
             ofl_version?: string;
             /** @description The person's own foods (`usr:`), as Open Food Log foods, oldest first; with `meals:read` only. */
             foods?: components["schemas"]["Food"][];
@@ -3231,7 +3231,7 @@ export interface components {
         Meal: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/meal.json";
-            /** @description The Open Food Log version, as MAJOR.MINOR: 0.3. */
+            /** @description The Open Food Log version, as MAJOR.MINOR: 0.4. */
             ofl_version: string;
             /** Format: uuid */
             id: string;
@@ -3447,7 +3447,7 @@ export interface components {
         Targets: {
             /** @constant */
             $schema: "https://openfoodlog.org/schema/v0/targets.json";
-            /** @description The Open Food Log version, as MAJOR.MINOR: 0.3. */
+            /** @description The Open Food Log version, as MAJOR.MINOR: 0.4. */
             ofl_version: string;
             /** Format: date-time */
             updated_at?: string;
@@ -3522,13 +3522,33 @@ export interface components {
             energy_kcal?: number;
             energy_kj?: number;
             protein_g?: number;
+            tryptophan_g?: number;
+            threonine_g?: number;
+            isoleucine_g?: number;
+            leucine_g?: number;
+            lysine_g?: number;
+            methionine_g?: number;
+            cystine_g?: number;
+            phenylalanine_g?: number;
+            tyrosine_g?: number;
+            valine_g?: number;
+            arginine_g?: number;
+            histidine_g?: number;
+            alanine_g?: number;
+            aspartic_acid_g?: number;
+            glutamic_acid_g?: number;
+            glycine_g?: number;
+            proline_g?: number;
+            serine_g?: number;
             fat_g?: number;
             saturated_fat_g?: number;
             monounsaturated_fat_g?: number;
             polyunsaturated_fat_g?: number;
             trans_fat_g?: number;
+            la_g?: number;
             ala_g?: number;
             epa_g?: number;
+            dpa_g?: number;
             dha_g?: number;
             cholesterol_mg?: number;
             carbohydrate_g?: number;
@@ -3536,6 +3556,12 @@ export interface components {
             fiber_g?: number;
             sugars_g?: number;
             added_sugars_g?: number;
+            sucrose_g?: number;
+            glucose_g?: number;
+            fructose_g?: number;
+            lactose_g?: number;
+            maltose_g?: number;
+            galactose_g?: number;
             starch_g?: number;
             polyols_g?: number;
             sodium_mg?: number;
@@ -3553,7 +3579,14 @@ export interface components {
             chromium_ug?: number;
             molybdenum_ug?: number;
             chloride_mg?: number;
+            fluoride_ug?: number;
             vitamin_a_rae_ug?: number;
+            retinol_ug?: number;
+            beta_carotene_ug?: number;
+            alpha_carotene_ug?: number;
+            beta_cryptoxanthin_ug?: number;
+            lycopene_ug?: number;
+            lutein_zeaxanthin_ug?: number;
             vitamin_c_mg?: number;
             vitamin_d_ug?: number;
             vitamin_e_mg?: number;
@@ -3584,7 +3617,7 @@ export interface components {
         };
         /** @description An Open Food Log food (https://openfoodlog.org/schema/v0/food.json). */
         Food: {
-            /** @description On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.3. */
+            /** @description On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.4. */
             ofl_version?: string;
             id: string;
             name: string;
