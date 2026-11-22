@@ -1155,7 +1155,7 @@ components:
       required: [$schema, ofl_version, id, date, logged_at, updated_at, source, items, estimates]
       properties:
         $schema: {type: string, const: "https://openfoodlog.org/schema/v0/meal.json"}
-        ofl_version: {type: string, description: "The Open Food Log version, as MAJOR.MINOR: 0.3."}
+        ofl_version: {type: string, description: "The Open Food Log version, as MAJOR.MINOR: 0.4."}
         id: {type: string, format: uuid}
         eaten_at: {type: string, format: date-time}
         date: {type: string, format: date}
@@ -1305,7 +1305,7 @@ components:
       required: [$schema, ofl_version, targets]
       properties:
         $schema: {type: string, const: "https://openfoodlog.org/schema/v0/targets.json"}
-        ofl_version: {type: string, pattern: "^0\\.[0-9]+$", description: "The Open Food Log version, as MAJOR.MINOR: 0.3."}
+        ofl_version: {type: string, pattern: "^0\\.[0-9]+$", description: "The Open Food Log version, as MAJOR.MINOR: 0.4."}
         updated_at: {type: string, format: date-time}
         targets: {type: array, items: {$ref: "#/components/schemas/Target"}}
     TargetsInput:
@@ -1375,13 +1375,33 @@ components:
         energy_kcal: {type: number, minimum: 0}
         energy_kj: {type: number, minimum: 0}
         protein_g: {type: number, minimum: 0}
+        tryptophan_g: {type: number, minimum: 0}
+        threonine_g: {type: number, minimum: 0}
+        isoleucine_g: {type: number, minimum: 0}
+        leucine_g: {type: number, minimum: 0}
+        lysine_g: {type: number, minimum: 0}
+        methionine_g: {type: number, minimum: 0}
+        cystine_g: {type: number, minimum: 0}
+        phenylalanine_g: {type: number, minimum: 0}
+        tyrosine_g: {type: number, minimum: 0}
+        valine_g: {type: number, minimum: 0}
+        arginine_g: {type: number, minimum: 0}
+        histidine_g: {type: number, minimum: 0}
+        alanine_g: {type: number, minimum: 0}
+        aspartic_acid_g: {type: number, minimum: 0}
+        glutamic_acid_g: {type: number, minimum: 0}
+        glycine_g: {type: number, minimum: 0}
+        proline_g: {type: number, minimum: 0}
+        serine_g: {type: number, minimum: 0}
         fat_g: {type: number, minimum: 0}
         saturated_fat_g: {type: number, minimum: 0}
         monounsaturated_fat_g: {type: number, minimum: 0}
         polyunsaturated_fat_g: {type: number, minimum: 0}
         trans_fat_g: {type: number, minimum: 0}
+        la_g: {type: number, minimum: 0}
         ala_g: {type: number, minimum: 0}
         epa_g: {type: number, minimum: 0}
+        dpa_g: {type: number, minimum: 0}
         dha_g: {type: number, minimum: 0}
         cholesterol_mg: {type: number, minimum: 0}
         carbohydrate_g: {type: number, minimum: 0}
@@ -1389,6 +1409,12 @@ components:
         fiber_g: {type: number, minimum: 0}
         sugars_g: {type: number, minimum: 0}
         added_sugars_g: {type: number, minimum: 0}
+        sucrose_g: {type: number, minimum: 0}
+        glucose_g: {type: number, minimum: 0}
+        fructose_g: {type: number, minimum: 0}
+        lactose_g: {type: number, minimum: 0}
+        maltose_g: {type: number, minimum: 0}
+        galactose_g: {type: number, minimum: 0}
         starch_g: {type: number, minimum: 0}
         polyols_g: {type: number, minimum: 0}
         sodium_mg: {type: number, minimum: 0}
@@ -1406,7 +1432,14 @@ components:
         chromium_ug: {type: number, minimum: 0}
         molybdenum_ug: {type: number, minimum: 0}
         chloride_mg: {type: number, minimum: 0}
+        fluoride_ug: {type: number, minimum: 0}
         vitamin_a_rae_ug: {type: number, minimum: 0}
+        retinol_ug: {type: number, minimum: 0}
+        beta_carotene_ug: {type: number, minimum: 0}
+        alpha_carotene_ug: {type: number, minimum: 0}
+        beta_cryptoxanthin_ug: {type: number, minimum: 0}
+        lycopene_ug: {type: number, minimum: 0}
+        lutein_zeaxanthin_ug: {type: number, minimum: 0}
         vitamin_c_mg: {type: number, minimum: 0}
         vitamin_d_ug: {type: number, minimum: 0}
         vitamin_e_mg: {type: number, minimum: 0}
@@ -1438,7 +1471,7 @@ components:
       type: object
       required: [id, name, kind, nutrients_per_100g]
       properties:
-        ofl_version: {type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.3."}
+        ofl_version: {type: string, description: "On a food read alone (GET /v1/foods/{id}): the Open Food Log version, 0.4."}
         id: {type: string}
         name: {type: string}
         kind: {type: string, enum: [generic, branded, custom], description: "branded: a packaged product."}
