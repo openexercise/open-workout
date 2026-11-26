@@ -1,11 +1,14 @@
-# Checks on every push and pull request (the Mighty portfolio GitHub standard, Section 5).
+# Checks on pull requests and pushes to main (the Mighty portfolio GitHub standard, Section 5).
 # This repository is public, so every job runs on GitHub-hosted runners, never the org's self-hosted
 # ones: a fork's pull request would run its code there. The `required` job at the end is the one
 # status check main's mighty-main ruleset requires; every other job goes in its needs.
 name: CI
 
 on:
+  # Branches are checked by their pull request; a push trigger on every branch would report a second
+  # `required` check, without the title and secret checks, for the same commit.
   push:
+    branches: [main]
   pull_request:
 
 permissions:
