@@ -20,6 +20,10 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Changed:** The Pages deploy uses `actions/upload-pages-artifact` v4.0.0 (was v3.0.1). v3 calls
+  `actions/upload-artifact@v4` by tag inside itself, which the organization's SHA-pinning policy can
+  refuse; v4 pins it by SHA. The site is unchanged: v4 leaves dotfiles out, and the site has none.
+
 - **Changed:** `main` is protected (pull request, squash only, linear history, no force push or
   deletion), and release tags can't be moved or deleted. CI's `required` job is the one check a pull
   request needs: it covers the existing jobs plus a PR title check and gitleaks on the pull
