@@ -20,6 +20,9 @@ Known gaps and deferred work, removed when it ships (and recorded under Unreleas
 
 ## Unreleased
 
+- **Changed:** Dependabot no longer offers `@types/node` majors. The types track the oldest Node
+  each package supports (`clients/ts` >=20, `partner-app` >=22), not the newest release.
+
 - **Changed:** The Pages deploy uses `actions/upload-pages-artifact` v4.0.0 (was v3.0.1). v3 calls
   `actions/upload-artifact@v4` by tag inside itself, which the organization's SHA-pinning policy can
   refuse; v4 pins it by SHA. The site is unchanged: v4 leaves dotfiles out, and the site has none.

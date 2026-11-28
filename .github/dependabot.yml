@@ -18,6 +18,10 @@ updates:
     commit-message: { prefix: "chore(deps)" }
     groups:
       npm-minor-patch: { update-types: [minor, patch] }
+    # @types/node tracks the oldest supported Node (engines), not the newest release.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
 
   - package-ecosystem: github-actions
     directory: /
